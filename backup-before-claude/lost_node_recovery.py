@@ -98,29 +98,20 @@ class LostNodeRecovery:
             prediction["predicted_y"],
         )
 
-        helper_node = self.topology.get_node(
-            helper["node_id"]
-        )
-
-        # Remember the helper's real position.
-        original_helper_position = (
-            helper_node.x,
-            helper_node.y,
-        )
-
         search_route = self.search_coordinator.find_search_route(
             helper["node_id"],
             prediction["predicted_x"],
             prediction["predicted_y"],
             prediction["search_radius"],
-            communication_range=self.communication_range,
         )
 
         helper_travelled = search_route["travel_required"]
 
         if helper_travelled:
-            # Simulate the helper travelling to the predicted
-            # search area.
+            helper_node = self.topology.get_node(
+                helper["node_id"]
+            )
+
             helper_node.x = prediction["predicted_x"]
             helper_node.y = prediction["predicted_y"]
 
@@ -139,12 +130,6 @@ class LostNodeRecovery:
                 else None
             ),
         )
-
-        # The helper's movement is only a simulation of the search.
-        # Restore its real network position before rebuilding topology.
-        if helper_travelled:
-            helper_node.x = original_helper_position[0]
-            helper_node.y = original_helper_position[1]
 
         if not search_result["discovered"]:
             self.lost_nodes[node_id]["status"] = "SEARCHING"
@@ -165,8 +150,8 @@ class LostNodeRecovery:
         node.y = prediction["predicted_y"]
         node.status = NodeStatus.ONLINE
 
-        # Rebuild connections using the actual final positions
-        # of the recovered node and surviving network nodes.
+        # Rebuild the node's connections using its newly
+        # discovered simulated position.
         connections = self.topology.reconnect_node(
             node_id,
             self.communication_range,

@@ -1,0 +1,1575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RESQ-MESH — Emergency Network Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   RESQ-MESH — tokens
+   ============================================================ */
+:root{
+  --bg:            #070b0c;
+  --bg-raise:      #0c1315;
+  --panel:         #0f181a;
+  --panel-2:       #121c1f;
+  --border:        #1c2b2e;
+  --border-soft:   #16team2226; /* fallback, overwritten below */
+  --border-soft:   #142125;
+  --text:          #d9e6e6;
+  --text-dim:      #7d9496;
+  --text-faint:    #4c6062;
+
+  --op-green:      #35d68f;
+  --op-green-dim:  #1c6a49;
+  --amber:         #f2a93b;
+  --amber-dim:     #6b4d18;
+  --red:           #ef5468;
+  --red-dim:       #6b1f2a;
+  --cyan:          #4fd0e0;
+  --purple:        #b58bf0;
+  --blue-cmd:      #6fa8ff;
+
+  --font-ui:   'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', monospace;
+
+  --radius: 3px;
+}
+
+*{ box-sizing:border-box; }
+html,body{ height:100%; }
+body{
+  margin:0;
+  background:
+    radial-gradient(ellipse at 20% -10%, #0e1c1c 0%, transparent 55%),
+    var(--bg);
+  color:var(--text);
+  font-family:var(--font-ui);
+  font-size:13px;
+  line-height:1.45;
+  -webkit-font-smoothing:antialiased;
+}
+::selection{ background:var(--op-green-dim); color:#fff; }
+::-webkit-scrollbar{ width:8px; height:8px; }
+::-webkit-scrollbar-track{ background:transparent; }
+::-webkit-scrollbar-thumb{ background:#1e2f32; border-radius:4px; }
+::-webkit-scrollbar-thumb:hover{ background:#2a4348; }
+
+a{ color:var(--cyan); }
+button{ font-family:inherit; }
+input,select,textarea{ font-family:inherit; }
+
+.mono{ font-family:var(--font-mono); }
+.dim{ color:var(--text-dim); }
+.faint{ color:var(--text-faint); }
+
+/* ============================================================
+   Layout shell
+   ============================================================ */
+.app{
+  max-width:1920px;
+  margin:0 auto;
+  padding:14px 18px 40px;
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+}
+
+/* ---------- Header ---------- */
+.topbar{
+  display:flex;
+  align-items:center;
+  gap:18px;
+  padding:12px 18px;
+  background:linear-gradient(180deg,#0d1719,#0a1213);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  flex-wrap:wrap;
+}
+.brand{ display:flex; align-items:center; gap:10px; margin-right:auto; }
+.brand-mark{
+  width:34px;height:34px;border-radius:6px;
+  background:conic-gradient(from 220deg, var(--op-green), var(--cyan), var(--op-green));
+  display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:13px;color:#05100e;letter-spacing:-0.5px;
+  box-shadow:0 0 18px -2px rgba(53,214,143,.55);
+}
+.brand-text h1{
+  margin:0; font-size:16.5px; letter-spacing:.5px; font-weight:700; color:#eef9f6;
+}
+.brand-text p{ margin:1px 0 0; font-size:11px; color:var(--text-dim); }
+
+.status-pill{
+  display:flex; align-items:center; gap:7px;
+  padding:6px 12px; border-radius:20px;
+  border:1px solid var(--border);
+  background:var(--panel);
+  font-size:11.5px; font-weight:600; letter-spacing:.4px;
+  font-family:var(--font-mono);
+}
+.status-dot{ width:8px;height:8px;border-radius:50%; flex:none; }
+.status-OPERATIONAL .status-dot{ background:var(--op-green); box-shadow:0 0 8px 1px var(--op-green); }
+.status-OPERATIONAL{ color:var(--op-green); border-color:var(--op-green-dim); }
+.status-DEGRADED .status-dot{ background:var(--amber); box-shadow:0 0 8px 1px var(--amber); }
+.status-DEGRADED{ color:var(--amber); border-color:var(--amber-dim); }
+.status-NODE_LOST .status-dot{ background:var(--amber); animation:pulseDot 1.1s infinite; }
+.status-NODE_LOST{ color:var(--amber); border-color:var(--amber-dim); }
+.status-OFFLINE .status-dot{ background:var(--red); }
+.status-OFFLINE{ color:var(--red); border-color:var(--red-dim); }
+@keyframes pulseDot{ 0%,100%{opacity:1;} 50%{opacity:.25;} }
+
+.conn-indicator{ display:flex; align-items:center; gap:6px; font-size:11px; font-family:var(--font-mono); }
+.conn-indicator .dot{ width:7px;height:7px;border-radius:50%; background:var(--text-faint); }
+.conn-indicator.ok .dot{ background:var(--op-green); box-shadow:0 0 6px var(--op-green); }
+.conn-indicator.bad .dot{ background:var(--red); box-shadow:0 0 6px var(--red); }
+
+.api-config{ display:flex; align-items:center; gap:6px; }
+.api-config input{
+  background:var(--bg-raise); border:1px solid var(--border); color:var(--text);
+  padding:6px 8px; border-radius:var(--radius); font-size:11px; width:190px;
+  font-family:var(--font-mono);
+}
+.api-config input:focus{ outline:none; border-color:var(--op-green-dim); }
+
+.btn{
+  border:1px solid var(--border);
+  background:var(--panel-2);
+  color:var(--text);
+  padding:7px 13px;
+  border-radius:var(--radius);
+  font-size:11.5px;
+  font-weight:600;
+  letter-spacing:.3px;
+  cursor:pointer;
+  transition:border-color .15s, background .15s, color .15s;
+  white-space:nowrap;
+}
+.btn:hover{ border-color:var(--text-dim); }
+.btn:disabled{ opacity:.4; cursor:not-allowed; }
+.btn-primary{ background:linear-gradient(180deg,#1c8f63,#136548); border-color:#1c8f63; color:#eafff5; }
+.btn-primary:hover{ border-color:var(--op-green); }
+.btn-amber{ background:linear-gradient(180deg,#8a5f1c,#5f3f0f); border-color:#8a5f1c; color:#fff3de; }
+.btn-red{ background:linear-gradient(180deg,#8a2233,#5f1522); border-color:#8a2233; color:#ffe6ea; }
+.btn-ghost{ background:transparent; }
+.btn-sm{ padding:4px 9px; font-size:10.5px; }
+.btn-block{ width:100%; }
+
+/* ---------- Grid regions ---------- */
+.layout{
+  display:grid;
+  grid-template-columns:270px 1fr 320px;
+  gap:14px;
+  align-items:start;
+}
+@media (max-width:1300px){
+  .layout{ grid-template-columns:1fr; }
+}
+
+.panel{
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  overflow:hidden;
+}
+.panel-head{
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  padding:10px 13px;
+  border-bottom:1px solid var(--border);
+  background:var(--panel-2);
+}
+.panel-head h2{
+  margin:0; font-size:11px; letter-spacing:1.2px; font-weight:700;
+  color:var(--text-dim); text-transform:uppercase;
+}
+.panel-head .tag{
+  font-family:var(--font-mono); font-size:10px; padding:2px 7px; border-radius:10px;
+  border:1px solid var(--border); color:var(--text-dim);
+}
+.panel-body{ padding:13px; }
+.panel + .panel{ margin-top:14px; }
+
+.row3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; }
+.row2{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+@media (max-width:1050px){ .row3, .row2{ grid-template-columns:1fr; } }
+
+/* ============================================================
+   Network Health
+   ============================================================ */
+.health-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; }
+.health-cell{
+  border:1px solid var(--border); border-radius:var(--radius); padding:8px 10px;
+  background:var(--bg-raise);
+}
+.health-cell .num{ font-family:var(--font-mono); font-size:20px; font-weight:700; line-height:1; }
+.health-cell .lbl{ font-size:10px; color:var(--text-dim); letter-spacing:.5px; margin-top:4px; }
+.health-cell.online .num{ color:var(--op-green); }
+.health-cell.lost .num{ color:var(--amber); }
+.health-cell.offline .num{ color:var(--red); }
+.health-cell.total .num{ color:var(--text); }
+.health-line{ display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px dashed var(--border-soft); font-size:11.5px; }
+.health-line:last-child{ border-bottom:none; }
+.health-line b{ font-family:var(--font-mono); }
+
+/* Node quick list */
+.node-list{ display:flex; flex-direction:column; gap:4px; margin-top:2px; }
+.node-row{
+  display:flex; align-items:center; gap:8px;
+  padding:7px 8px; border-radius:var(--radius); cursor:pointer;
+  border:1px solid transparent;
+}
+.node-row:hover{ background:var(--bg-raise); }
+.node-row.selected{ border-color:var(--op-green-dim); background:#0f231c; }
+.node-row .dot{ width:8px;height:8px;border-radius:50%; flex:none; }
+.node-row .dot.online{ background:var(--op-green); box-shadow:0 0 6px var(--op-green); }
+.node-row .dot.lost{ background:var(--amber); animation:pulseDot 1.1s infinite; }
+.node-row .dot.offline{ background:var(--red); opacity:.7; }
+.node-row .id{ font-family:var(--font-mono); font-weight:700; font-size:12px; }
+.node-row .type{ font-size:10px; color:var(--text-dim); margin-left:auto; }
+
+/* ============================================================
+   Network Map
+   ============================================================ */
+.map-panel .panel-body{ padding:0; position:relative; }
+.map-wrap{ position:relative; width:100%; aspect-ratio:16/10; background:
+  linear-gradient(var(--bg-raise), var(--bg-raise));
+}
+.map-svg{ width:100%; height:100%; display:block; }
+.map-caption{
+  position:absolute; left:10px; bottom:8px;
+  font-family:var(--font-mono); font-size:10px; color:var(--text-faint);
+  letter-spacing:.4px; pointer-events:none;
+}
+.map-legend{
+  position:absolute; top:10px; right:10px;
+  background:rgba(9,15,16,.82); border:1px solid var(--border); border-radius:var(--radius);
+  padding:8px 10px; font-size:10px; color:var(--text-dim);
+  display:flex; flex-direction:column; gap:5px; backdrop-filter:blur(2px);
+}
+.legend-row{ display:flex; align-items:center; gap:6px; }
+.legend-swatch{ width:10px;height:10px;border-radius:50%; flex:none; }
+
+@keyframes dashFlow{ to{ stroke-dashoffset:-40; } }
+@keyframes ringPulse{
+  0%{ r:6; opacity:.9; }
+  100%{ r:22; opacity:0; }
+}
+
+/* ============================================================
+   Node details
+   ============================================================ */
+.detail-empty{ color:var(--text-faint); font-size:12px; padding:6px 2px; }
+.detail-head{ display:flex; align-items:baseline; gap:8px; margin-bottom:10px; }
+.detail-head .id{ font-family:var(--font-mono); font-size:19px; font-weight:700; }
+.detail-head .type{ font-size:11px; color:var(--text-dim); }
+.status-chip{
+  display:inline-block; padding:2px 9px; border-radius:11px; font-size:10.5px;
+  font-weight:700; letter-spacing:.5px; font-family:var(--font-mono);
+  border:1px solid transparent;
+}
+.status-chip.online{ background:#0f2a1f; color:var(--op-green); border-color:var(--op-green-dim); }
+.status-chip.lost{ background:#2a2010; color:var(--amber); border-color:var(--amber-dim); }
+.status-chip.offline{ background:#2a1418; color:var(--red); border-color:var(--red-dim); }
+
+.kv-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px 12px; margin:10px 0; }
+.kv{ font-size:11px; }
+.kv .k{ color:var(--text-dim); font-size:10px; letter-spacing:.4px; margin-bottom:2px; }
+.kv .v{ font-family:var(--font-mono); font-size:13px; font-weight:600; }
+.bar{ height:5px; border-radius:3px; background:var(--bg-raise); overflow:hidden; margin-top:3px; border:1px solid var(--border-soft); }
+.bar > span{ display:block; height:100%; background:var(--op-green); }
+
+.chip-list{ display:flex; flex-wrap:wrap; gap:5px; margin-top:4px; }
+.chip{
+  font-family:var(--font-mono); font-size:10.5px; padding:2px 7px;
+  border:1px solid var(--border); border-radius:10px; color:var(--text-dim);
+}
+
+.action-grid{ display:flex; flex-direction:column; gap:7px; margin-top:12px; }
+.field-row{ display:flex; gap:6px; }
+.field-row input, .field-row select{
+  flex:1; background:var(--bg-raise); border:1px solid var(--border); color:var(--text);
+  padding:6px 8px; border-radius:var(--radius); font-size:11.5px;
+}
+.field-row input:focus, .field-row select:focus{ outline:none; border-color:var(--op-green-dim); }
+.mini-label{ font-size:10px; color:var(--text-dim); letter-spacing:.4px; margin:6px 0 3px; }
+
+/* ============================================================
+   Recovery pipeline
+   ============================================================ */
+.pipeline{
+  display:flex; align-items:stretch; gap:0; overflow-x:auto; padding:4px 2px;
+}
+.pipe-step{
+  flex:1 0 100px; min-width:100px; text-align:center; position:relative; padding:10px 6px 4px;
+}
+.pipe-step .icon{
+  width:26px;height:26px;border-radius:50%; margin:0 auto 8px; display:flex;align-items:center;justify-content:center;
+  font-size:12px; font-weight:700; font-family:var(--font-mono);
+  background:var(--bg-raise); border:2px solid var(--border-soft); color:var(--text-faint);
+}
+.pipe-step .lbl{ font-size:9.5px; letter-spacing:.3px; color:var(--text-faint); line-height:1.25; }
+.pipe-step::before{
+  content:''; position:absolute; top:23px; left:-50%; width:100%; height:2px;
+  background:var(--border-soft); z-index:0;
+}
+.pipe-step:first-child::before{ display:none; }
+.pipe-step.done .icon{ background:var(--op-green-dim); border-color:var(--op-green); color:#eafff5; }
+.pipe-step.done .lbl{ color:var(--op-green); }
+.pipe-step.done::before{ background:var(--op-green-dim); }
+.pipe-step.current .icon{ background:var(--amber-dim); border-color:var(--amber); color:#fff3de; animation:pulseDot 1.3s infinite; }
+.pipe-step.current .lbl{ color:var(--amber); font-weight:600; }
+.pipe-step.failed .icon{ background:var(--red-dim); border-color:var(--red); color:#ffe6ea; }
+.pipe-step.failed .lbl{ color:var(--red); }
+
+/* ============================================================
+   Recovery workflow cards
+   ============================================================ */
+.subhead{ font-size:10px; letter-spacing:.6px; color:var(--text-faint); text-transform:uppercase; margin:0 0 6px; }
+.stat-line{ display:flex; justify-content:space-between; padding:4px 0; font-size:11.5px; border-bottom:1px dashed var(--border-soft); }
+.stat-line:last-child{ border-bottom:none; }
+.stat-line b{ font-family:var(--font-mono); }
+.marker-amber{ color:var(--amber); }
+.marker-purple{ color:var(--purple); }
+.marker-cyan{ color:var(--cyan); }
+
+.candidate-table{ width:100%; border-collapse:collapse; font-size:10.8px; margin-top:6px; }
+.candidate-table th{ text-align:left; color:var(--text-faint); font-weight:600; padding:4px 6px; border-bottom:1px solid var(--border); font-size:9.5px; letter-spacing:.3px; }
+.candidate-table td{ padding:4px 6px; border-bottom:1px solid var(--border-soft); font-family:var(--font-mono); }
+.candidate-table tr.winner td{ color:var(--op-green); }
+
+.route-chain{ display:flex; flex-wrap:wrap; align-items:center; gap:4px; margin-top:6px; font-family:var(--font-mono); font-size:12.5px; }
+.route-chain .hop{ padding:3px 8px; border-radius:var(--radius); border:1px solid var(--border); background:var(--bg-raise); }
+.route-chain .hop.src{ border-color:var(--op-green-dim); color:var(--op-green); }
+.route-chain .hop.dst{ border-color:var(--blue-cmd); color:var(--blue-cmd); }
+.route-chain .arrow{ color:var(--text-faint); }
+
+.badge{ display:inline-block; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:700; letter-spacing:.4px; font-family:var(--font-mono); }
+.badge.waiting{ background:var(--bg-raise); color:var(--text-faint); border:1px solid var(--border); }
+.badge.searching{ background:var(--amber-dim); color:var(--amber); }
+.badge.found{ background:var(--op-green-dim); color:var(--op-green); }
+.badge.notfound{ background:var(--red-dim); color:var(--red); }
+
+.discovery-flow{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:8px; font-family:var(--font-mono); font-size:11px; }
+.discovery-flow .step{ padding:3px 9px; border-radius:12px; border:1px solid var(--border); color:var(--text-faint); }
+.discovery-flow .step.active{ border-color:var(--op-green); color:var(--op-green); background:#0f2a1f; }
+.discovery-flow .arrow{ color:var(--text-faint); }
+
+.empty-note{ color:var(--text-faint); font-size:11.5px; padding:8px 2px; }
+
+/* ============================================================
+   Event log
+   ============================================================ */
+.log-list{ max-height:230px; overflow-y:auto; display:flex; flex-direction:column-reverse; gap:0; }
+.log-row{ display:flex; gap:10px; padding:5px 2px; border-bottom:1px solid var(--border-soft); font-size:11px; }
+.log-row .t{ font-family:var(--font-mono); color:var(--text-faint); flex:none; width:72px; }
+.log-row .type{ flex:none; width:150px; font-family:var(--font-mono); font-size:10px; letter-spacing:.3px; }
+.log-row .msg{ color:var(--text); }
+.log-row.ev-LOST .type, .log-row.ev-lost .type{ color:var(--amber); }
+.log-row.ev-FAIL .type, .log-row.ev-OFFLINE .type{ color:var(--red); }
+.log-row.ev-FOUND .type, .log-row.ev-RECOVER .type, .log-row.ev-ONLINE .type{ color:var(--op-green); }
+.log-row.ev-MESSAGE .type, .log-row.ev-ROUTE .type{ color:var(--cyan); }
+.log-row.ev-INFO .type{ color:var(--text-dim); }
+
+.toolbar-row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+
+.banner{
+  padding:9px 12px; border-radius:var(--radius); font-size:11.5px; margin-bottom:10px;
+  border:1px solid var(--border);
+}
+.banner.err{ background:#2a1418; border-color:var(--red-dim); color:#ffc8d0; }
+.banner.ok{ background:#0f2a1f; border-color:var(--op-green-dim); color:#c9ffe8; }
+.banner.warn{ background:#2a2010; border-color:var(--amber-dim); color:#ffe6bd; }
+
+.footer-note{
+  text-align:center; color:var(--text-faint); font-size:10.5px; padding:8px 0 0;
+  font-family:var(--font-mono);
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ============================================================ HEADER -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">RM</div>
+      <div class="brand-text">
+        <h1>RESQ&#8209;MESH</h1>
+        <p>Disaster&#8209;Resilient Emergency Communication Network</p>
+      </div>
+    </div>
+
+    <div id="systemStatusPill" class="status-pill status-OFFLINE">
+      <span class="status-dot"></span><span id="systemStatusLabel">OFFLINE</span>
+    </div>
+
+    <div id="connIndicator" class="conn-indicator bad">
+      <span class="dot"></span><span id="connLabel">backend unreachable</span>
+    </div>
+
+    <div class="api-config">
+      <span class="dim mono" style="font-size:11px;">API</span>
+      <input id="apiBaseInput" type="text" value="http://127.0.0.1:8000" spellcheck="false" />
+      <button class="btn btn-sm" id="apiSaveBtn">Connect</button>
+    </div>
+
+    <button class="btn btn-sm" id="resetBtn">Reset Network</button>
+    <button class="btn btn-sm btn-primary" id="demoBtn">▶ Run Recovery Demo</button>
+    <button class="btn btn-sm btn-ghost" id="demoPauseBtn" style="display:none;">Pause</button>
+  </header>
+
+  <div id="globalBanner"></div>
+
+  <!-- ============================================================ MAIN LAYOUT -->
+  <div class="layout">
+
+    <!-- ---------------- LEFT SIDEBAR ---------------- -->
+    <aside>
+      <div class="panel">
+        <div class="panel-head"><h2>Network Health</h2><span class="tag" id="healthApiTag">/network/status</span></div>
+        <div class="panel-body">
+          <div class="health-grid">
+            <div class="health-cell total"><div class="num" id="hTotal">–</div><div class="lbl">TOTAL NODES</div></div>
+            <div class="health-cell online"><div class="num" id="hOnline">–</div><div class="lbl">ONLINE</div></div>
+            <div class="health-cell lost"><div class="num" id="hLost">–</div><div class="lbl">LOST</div></div>
+            <div class="health-cell offline"><div class="num" id="hOffline">–</div><div class="lbl">OFFLINE</div></div>
+          </div>
+          <div class="health-line"><span class="dim">Active links</span><b id="hLinks">–</b></div>
+          <div class="health-line"><span class="dim">Connectivity</span><b id="hConnectivity">–</b></div>
+          <div class="health-line"><span class="dim">Emergency route</span><b id="hRoute" class="mono" style="font-size:10.5px;">none set</b></div>
+          <div class="health-line"><span class="dim">Backend</span><b id="hBackend">–</b></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h2>Nodes</h2><span class="tag" id="nodeCountTag">0</span></div>
+        <div class="panel-body">
+          <div class="node-list" id="nodeList"><div class="empty-note">Connecting to backend…</div></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ---------------- CENTER MAP ---------------- -->
+    <section class="panel map-panel">
+      <div class="panel-head">
+        <h2>Live Network Map</h2>
+        <span class="tag">GET /network/topology · /network/nodes</span>
+      </div>
+      <div class="panel-body">
+        <div class="map-wrap">
+          <svg class="map-svg" id="mapSvg" viewBox="0 0 900 560" preserveAspectRatio="xMidYMid meet"></svg>
+          <div class="map-caption">SIMULATION COORDINATES — NOT GPS</div>
+          <div class="map-legend">
+            <div class="legend-row"><span class="legend-swatch" style="background:var(--op-green)"></span>Online</div>
+            <div class="legend-row"><span class="legend-swatch" style="background:var(--amber)"></span>Lost</div>
+            <div class="legend-row"><span class="legend-swatch" style="background:var(--red)"></span>Offline</div>
+            <div class="legend-row"><span class="legend-swatch" style="background:var(--cyan);border-radius:2px;"></span>Dijkstra route</div>
+            <div class="legend-row"><span class="legend-swatch" style="background:var(--purple);border-radius:2px;"></span>A* search route</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------------- RIGHT: NODE DETAILS ---------------- -->
+    <aside class="panel">
+      <div class="panel-head"><h2>Node Details</h2><span class="tag" id="selectedTag">none selected</span></div>
+      <div class="panel-body" id="nodeDetailBody">
+        <div class="detail-empty">Select a node on the map or from the list to view its telemetry and available actions.</div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ============================================================ RECOVERY PIPELINE -->
+  <section class="panel">
+    <div class="panel-head"><h2>Recovery Timeline</h2><span class="tag" id="pipelineTag">idle</span></div>
+    <div class="panel-body">
+      <div class="pipeline" id="pipeline"></div>
+    </div>
+  </section>
+
+  <!-- ============================================================ LOST NODE / HELPER / A* / DISCOVERY -->
+  <div class="row3">
+    <div class="panel">
+      <div class="panel-head"><h2>Lost Node Tracking</h2><span class="tag">location_tracker</span></div>
+      <div class="panel-body" id="lostTrackingBody">
+        <div class="empty-note">No node is currently marked LOST. Move a node beyond communication range (10 units) to trigger detection.</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Helper Selection &amp; A* Search</h2><span class="tag">POST /recover-lost</span></div>
+      <div class="panel-body" id="helperSearchBody">
+        <div class="empty-note">Recovery helper and A* search-route data will appear here once a lost-node recovery is run.</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Discovery &amp; Topology Rebuild</h2><span class="tag">reconnect_node</span></div>
+      <div class="panel-body" id="discoveryBody">
+        <div class="empty-note">Node rediscovery and mesh reconnection results will appear here once recovery completes.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ ROUTING + MESSAGING -->
+  <div class="row2">
+    <div class="panel">
+      <div class="panel-head"><h2>Dijkstra — Emergency Communication Routing</h2><span class="tag">GET /network/route</span></div>
+      <div class="panel-body">
+        <div class="field-row">
+          <select id="routeSource"></select>
+          <select id="routeDest"></select>
+          <button class="btn btn-sm btn-primary" id="routeGoBtn">Find Route</button>
+        </div>
+        <div id="routeResult" style="margin-top:10px;">
+          <div class="empty-note">Choose a source and destination and find the current lowest-cost route through the surviving mesh.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Emergency Message</h2><span class="tag">POST /network/messages/send</span></div>
+      <div class="panel-body">
+        <div class="field-row">
+          <select id="msgSource"></select>
+          <select id="msgDest"></select>
+        </div>
+        <div class="field-row" style="margin-top:6px;">
+          <select id="msgPriority">
+            <option value="critical">CRITICAL</option>
+            <option value="high">HIGH</option>
+            <option value="normal" selected>NORMAL</option>
+          </select>
+        </div>
+        <textarea id="msgContent" rows="2" placeholder="Emergency: requesting assistance."
+          style="width:100%; margin-top:6px; background:var(--bg-raise); border:1px solid var(--border); color:var(--text); border-radius:3px; padding:7px 8px; font-size:11.5px; resize:vertical;"></textarea>
+        <button class="btn btn-sm btn-primary btn-block" style="margin-top:8px;" id="msgSendBtn">Send Emergency Message</button>
+        <div id="msgResult" style="margin-top:10px;">
+          <div class="empty-note">Delivery status and the actual route used will appear here.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ EVENT LOG -->
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Event / Activity Log</h2>
+      <span class="tag" id="logSourceTag">local</span>
+    </div>
+    <div class="panel-body">
+      <div class="log-list" id="logList"></div>
+    </div>
+  </section>
+
+  <div class="footer-note">RESQ&#8209;MESH is a software-only simulation. Coordinates, movement, battery, signal strength and node loss/recovery are simulated — there is no physical GPS, RSSI, or hardware involved.</div>
+</div>
+
+<script>
+/* ============================================================
+   RESQ-MESH dashboard client
+   Talks only to the real FastAPI backend. No client-side fake
+   simulation of network state — every value on screen comes
+   from an API response.
+   ============================================================ */
+
+const NODE_TYPE_META = {
+  rescue_team:    { label:'Rescue Team',   glyph:'\u25B2' },
+  ambulance:      { label:'Ambulance',     glyph:'\u2295' },
+  fire_rescue:    { label:'Fire/Rescue',   glyph:'\u2B22' },
+  police:         { label:'Police',        glyph:'\u25A0' },
+  drone:          { label:'Drone',         glyph:'\u2726' },
+  command_center: { label:'Command Center',glyph:'\u2605' },
+};
+
+const state = {
+  apiBase: localStorage.getItem('resqmesh_api') || 'http://127.0.0.1:8000',
+  connected: false,
+  nodes: [],
+  topology: { nodes:[], connections:[] },
+  status: {},
+  selectedId: null,
+  serverEventsAvailable: null, // null=unknown, true/false once probed
+  localLog: [],
+  lostContext: {},   // per-node: { lastKnown, prediction, helper, search, discovery, reconnected, candidates }
+  dijkstraRoute: null,
+  aStarRoute: null,
+  lastMessageRoute: null,
+  pipelineStage: 'IDLE',
+  pipelineFailed: false,
+  demo: { running:false, paused:false, cancelled:false },
+};
+
+const $ = (sel) => document.querySelector(sel);
+const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
+
+/* ---------------- API layer ---------------- */
+async function api(method, path, body) {
+  const url = state.apiBase.replace(/\/$/, '') + path;
+  const opts = { method, headers: {} };
+  if (body !== undefined) {
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(body);
+  }
+  const res = await fetch(url, opts);
+  let data = null;
+  try { data = await res.json(); } catch (e) { /* no body */ }
+  if (!res.ok) {
+    const msg = (data && (data.detail || data.error)) || `HTTP ${res.status}`;
+    throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
+  }
+  if (data && data.error) throw new Error(data.error);
+  return data;
+}
+
+function showBanner(kind, text, timeout) {
+  const box = $('#globalBanner');
+  box.innerHTML = '';
+  const b = el('div', `banner ${kind}`, text);
+  box.appendChild(b);
+  if (timeout) setTimeout(() => { if (box.contains(b)) box.removeChild(b); }, timeout);
+}
+
+/* ---------------- Local event log fallback ---------------- */
+function logLocal(type, message) {
+  state.localLog.push({ event_type: type, message, timestamp: new Date().toISOString() });
+  if (state.localLog.length > 300) state.localLog.shift();
+  if (!state.serverEventsAvailable) renderLog(state.localLog);
+}
+
+function renderLog(events) {
+  const list = $('#logList');
+  list.innerHTML = '';
+  const sorted = [...events].sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
+  for (const ev of sorted.slice(-150)) {
+    const row = el('div', `log-row ev-${(ev.event_type||'INFO').split('_')[0]}`);
+    const t = new Date(ev.timestamp);
+    const tStr = isNaN(t) ? '--:--:--' : t.toLocaleTimeString('en-GB');
+    row.appendChild(el('span','t mono', tStr));
+    row.appendChild(el('span','type mono', ev.event_type || 'INFO'));
+    row.appendChild(el('span','msg', ev.message || ''));
+    list.appendChild(row);
+  }
+}
+
+/* ---------------- Polling ---------------- */
+let pollTimer = null;
+async function pollOnce() {
+  try {
+    const [status, nodes, topology] = await Promise.all([
+      api('GET', '/network/status'),
+      api('GET', '/network/nodes'),
+      api('GET', '/network/topology'),
+    ]);
+    state.status = status;
+    state.nodes = nodes;
+    state.topology = topology;
+    setConnected(true);
+
+    // try server-side event log (optional patch)
+    try {
+      const events = await api('GET', '/network/events');
+      state.serverEventsAvailable = true;
+      $('#logSourceTag').textContent = 'GET /network/events';
+      renderLog(events.map(e => ({ event_type: e.event_type, message: e.message, timestamp: e.timestamp })));
+    } catch (e) {
+      if (state.serverEventsAvailable === null) {
+        state.serverEventsAvailable = false;
+        $('#logSourceTag').textContent = 'local (patch backend for authoritative log)';
+      }
+      renderLog(state.localLog);
+    }
+
+    renderAll();
+  } catch (e) {
+    setConnected(false);
+  }
+}
+
+function setConnected(ok) {
+  const wasConnected = state.connected;
+  state.connected = ok;
+  const ind = $('#connIndicator');
+  ind.className = 'conn-indicator ' + (ok ? 'ok' : 'bad');
+  $('#connLabel').textContent = ok ? 'backend connected' : 'backend unreachable';
+  $('#hBackend').textContent = ok ? 'ONLINE' : 'UNREACHABLE';
+  if (ok && !wasConnected) logLocal('INFO', `Connected to backend at ${state.apiBase}`);
+  if (!ok) {
+    $('#systemStatusPill').className = 'status-pill status-OFFLINE';
+    $('#systemStatusLabel').textContent = 'OFFLINE';
+  }
+}
+
+function startPolling() {
+  if (pollTimer) clearInterval(pollTimer);
+  pollOnce();
+  pollTimer = setInterval(pollOnce, 2200);
+}
+
+/* ---------------- Derived health (client aggregates real node data;
+   /network/status currently only counts online+offline, not lost) --- */
+function computeHealth() {
+  const nodes = state.nodes;
+  const online = nodes.filter(n => n.status === 'online').length;
+  const lost = nodes.filter(n => n.status === 'lost').length;
+  const offline = nodes.filter(n => n.status === 'offline').length;
+  const total = nodes.length;
+  const links = state.topology.connections ? state.topology.connections.length : 0;
+  return { total, online, lost, offline, links };
+}
+
+function systemStatusFromHealth(h) {
+  if (!state.connected) return 'OFFLINE';
+  if (h.lost > 0) return 'NODE_LOST';
+  if (h.offline > 0) return 'DEGRADED';
+  return 'OPERATIONAL';
+}
+
+/* ---------------- Render: header + health ---------------- */
+function renderHealth() {
+  const h = computeHealth();
+  $('#hTotal').textContent = h.total;
+  $('#hOnline').textContent = h.online;
+  $('#hLost').textContent = h.lost;
+  $('#hOffline').textContent = h.offline;
+  $('#hLinks').textContent = h.links;
+  $('#hConnectivity').textContent = h.total ? Math.round((h.online / h.total) * 100) + '%' : '–';
+
+  const sys = systemStatusFromHealth(h);
+  const pill = $('#systemStatusPill');
+  pill.className = 'status-pill status-' + sys;
+  $('#systemStatusLabel').textContent = sys.replace('_',' ');
+
+  if (state.lastMessageRoute) {
+    $('#hRoute').textContent = state.lastMessageRoute.join(' \u2192 ');
+  } else if (state.dijkstraRoute) {
+    $('#hRoute').textContent = state.dijkstraRoute.join(' \u2192 ');
+  }
+}
+
+/* ---------------- Render: node list ---------------- */
+function renderNodeList() {
+  const list = $('#nodeList');
+  list.innerHTML = '';
+  $('#nodeCountTag').textContent = state.nodes.length;
+  for (const n of state.nodes) {
+    const row = el('div', 'node-row' + (state.selectedId === n.node_id ? ' selected' : ''));
+    row.appendChild(el('span', `dot ${n.status}`));
+    row.appendChild(el('span', 'id', n.node_id));
+    row.appendChild(el('span', 'type', (NODE_TYPE_META[n.type] || {}).label || n.type));
+    row.addEventListener('click', () => selectNode(n.node_id));
+    list.appendChild(row);
+  }
+}
+
+/* ---------------- Node selection + detail panel ---------------- */
+function selectNode(id) {
+  state.selectedId = id;
+  renderNodeList();
+  renderMap();
+  renderDetail();
+}
+
+function bodyContainsActiveInput(active) {
+  const body = $('#nodeDetailBody');
+  if (!body || !active || !body.contains(active)) return false;
+
+  const tag = active.tagName;
+  return tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA';
+}
+
+function renderDetail() {
+  // Prevent polling from replacing inputs while the user is editing.
+  const active = document.activeElement;
+  if (bodyContainsActiveInput(active)) {
+    return;
+  }
+  
+  const body = $('#nodeDetailBody');
+  const tag = $('#selectedTag');
+  const node = state.nodes.find(n => n.node_id === state.selectedId);
+  if (!node) {
+    tag.textContent = 'none selected';
+    body.innerHTML = '<div class="detail-empty">Select a node on the map or from the list to view its telemetry and available actions.</div>';
+    return;
+  }
+  tag.textContent = node.node_id;
+  const meta = NODE_TYPE_META[node.type] || { label: node.type };
+
+  body.innerHTML = '';
+  const head = el('div', 'detail-head');
+  head.appendChild(el('span', 'id', node.node_id));
+  head.appendChild(el('span', 'type', meta.label));
+  head.appendChild(el('span', `status-chip ${node.status}`, node.status.toUpperCase()));
+  body.appendChild(head);
+
+  const kv = el('div', 'kv-grid');
+  kv.appendChild(kvBlock('POSITION X', node.x.toFixed(2)));
+  kv.appendChild(kvBlock('POSITION Y', node.y.toFixed(2)));
+  kv.appendChild(kvBlock('SPEED', node.speed));
+  kv.appendChild(kvBlock('DIRECTION', node.direction + '\u00B0'));
+  body.appendChild(kv);
+
+  body.appendChild(barBlock('BATTERY', node.battery));
+  body.appendChild(barBlock('SIGNAL STRENGTH (simulated)', node.signal_strength));
+
+  const neighborsWrap = el('div');
+  neighborsWrap.appendChild(el('div', 'mini-label', 'NEIGHBORS'));
+  const chips = el('div', 'chip-list');
+  if (node.neighbors && node.neighbors.length) {
+    node.neighbors.forEach(nb => chips.appendChild(el('span', 'chip', nb)));
+  } else {
+    chips.appendChild(el('span', 'chip', 'none'));
+  }
+  neighborsWrap.appendChild(chips);
+  body.appendChild(neighborsWrap);
+
+  const connState = el('div', 'health-line');
+  connState.innerHTML = `<span class="dim">Connection state</span><b>${(node.neighbors && node.neighbors.length) ? 'Connected' : 'Disconnected'}</b>`;
+  body.appendChild(connState);
+
+  // Actions
+  const actions = el('div', 'action-grid');
+
+  if (node.status === 'online') {
+    const moveRow = el('div');
+    moveRow.appendChild(el('div', 'mini-label', 'MOVE NODE'));
+    const fr = el('div', 'field-row');
+    const xIn = el('input'); xIn.type = 'number'; xIn.placeholder = 'X'; xIn.value = node.x;
+    const yIn = el('input'); yIn.type = 'number'; yIn.placeholder = 'Y'; yIn.value = node.y;
+    fr.appendChild(xIn); fr.appendChild(yIn);
+    moveRow.appendChild(fr);
+    const moveBtn = el('button', 'btn btn-sm btn-block', 'Move Node');
+    moveBtn.style.marginTop = '6px';
+    moveBtn.addEventListener('click', () => moveNode(node.node_id, parseFloat(xIn.value), parseFloat(yIn.value)));
+    moveRow.appendChild(moveBtn);
+    actions.appendChild(moveRow);
+
+    const failBtn = el('button', 'btn btn-sm btn-red btn-block', 'Fail Node');
+    failBtn.addEventListener('click', () => failNode(node.node_id));
+    actions.appendChild(failBtn);
+  }
+
+  if (node.status === 'offline') {
+    const recBtn = el('button', 'btn btn-sm btn-primary btn-block', 'Recover Node');
+    recBtn.addEventListener('click', () => recoverNode(node.node_id));
+    actions.appendChild(recBtn);
+  }
+
+  if (node.status === 'lost') {
+    const wrap = el('div');
+    wrap.appendChild(el('div', 'mini-label', 'ELAPSED TIME SINCE LOSS (simulated units)'));
+    const fr = el('div', 'field-row');
+    const elapsedIn = el('input'); elapsedIn.type = 'number'; elapsedIn.value = '4'; elapsedIn.min = '0'; elapsedIn.step = '0.5';
+    fr.appendChild(elapsedIn);
+    wrap.appendChild(fr);
+    const recLostBtn = el('button', 'btn btn-sm btn-amber btn-block', 'Recover Lost Node');
+    recLostBtn.style.marginTop = '6px';
+    recLostBtn.addEventListener('click', () => recoverLostNode(node.node_id, parseFloat(elapsedIn.value) || 0));
+    wrap.appendChild(recLostBtn);
+    actions.appendChild(wrap);
+  }
+
+  body.appendChild(actions);
+}
+
+function kvBlock(label, value) {
+  const d = el('div', 'kv');
+  d.appendChild(el('div', 'k', label));
+  d.appendChild(el('div', 'v', value));
+  return d;
+}
+function barBlock(label, pct) {
+  const wrap = el('div');
+  wrap.style.marginBottom = '8px';
+  const top = el('div', 'health-line');
+  top.innerHTML = `<span class="dim" style="font-size:10px; letter-spacing:.4px;">${label}</span><b class="mono">${Number(pct).toFixed(0)}%</b>`;
+  top.style.borderBottom = 'none'; top.style.padding = '0';
+  wrap.appendChild(top);
+  const bar = el('div', 'bar');
+  const span = el('span'); span.style.width = Math.max(0, Math.min(100, pct)) + '%';
+  if (pct < 30) span.style.background = 'var(--red)'; else if (pct < 60) span.style.background = 'var(--amber)';
+  bar.appendChild(span);
+  wrap.appendChild(bar);
+  return wrap;
+}
+
+/* ---------------- Node actions (real API calls) ---------------- */
+async function moveNode(id, x, y) {
+  try {
+    const result = await api('POST', `/network/nodes/${id}/move`, { x, y });
+    logLocal('MOVE', `${id} moved to (${x}, ${y})`);
+    if (result.lost_detected) {
+      logLocal('LOST', `${id} lost communication — no reachable neighbor within range`);
+      state.lostContext[id] = { lastKnown: { x: result.x, y: result.y, speed: result.speed, direction: result.direction }, capturedAt: Date.now() };
+      setPipelineStage('LOST');
+    }
+    await pollOnce();
+    if (state.selectedId === id) renderDetail();
+  } catch (e) {
+    showBanner('err', `Move failed: ${e.message}`, 5000);
+  }
+}
+
+async function failNode(id) {
+  try {
+    await api('POST', `/network/nodes/${id}/fail`);
+    logLocal('FAIL', `${id} failed / went OFFLINE`);
+    await pollOnce();
+    renderDetail();
+  } catch (e) { showBanner('err', `Fail failed: ${e.message}`, 5000); }
+}
+
+async function recoverNode(id) {
+  try {
+    await api('POST', `/network/nodes/${id}/recover`);
+    logLocal('RECOVER', `${id} recovered / back ONLINE`);
+    await pollOnce();
+    renderDetail();
+  } catch (e) { showBanner('err', `Recover failed: ${e.message}`, 5000); }
+}
+
+async function recoverLostNode(id, elapsedTime) {
+  try {
+    setPipelineStage('PREDICTED');
+    const result = await api('POST', `/network/nodes/${id}/recover-lost`, { elapsed_time: elapsedTime });
+    handleRecoveryResult(id, result, elapsedTime);
+  } catch (e) {
+    showBanner('err', `Recovery failed: ${e.message}`, 6000);
+  }
+}
+
+function handleRecoveryResult(id, result, elapsedTime) {
+  const ctx = state.lostContext[id] || {};
+  ctx.prediction = result.prediction;
+  ctx.helper = result.helper;
+  ctx.search = result.search;
+  ctx.discovery = result.discovery;
+  ctx.reconnected = result.reconnected_to || null;
+  ctx.status = result.status;
+  ctx.elapsedTime = elapsedTime;
+  state.lostContext[id] = ctx;
+
+  logLocal('PREDICT', `Predicted search area for ${id}: (${result.prediction.predicted_x.toFixed(1)}, ${result.prediction.predicted_y.toFixed(1)}), radius ${result.prediction.search_radius.toFixed(1)}`);
+  logLocal('HELPER', `${result.helper.node_id} selected as recovery helper (score ${result.helper.score.toFixed(2)})`);
+  logLocal('ASTAR', `A* search route for ${result.helper.node_id}: ${result.search.route.join(' -> ')}`);
+
+  setPipelineStage('SEARCH_AREA');
+  setTimeout(() => setPipelineStage('HELPER_SELECTED'), 150);
+  setTimeout(() => setPipelineStage('ASTAR_SEARCH'), 300);
+
+  if (result.status === 'FOUND') {
+    logLocal('FOUND', `${id} rediscovered at (${result.prediction.predicted_x.toFixed(1)}, ${result.prediction.predicted_y.toFixed(1)})`);
+    logLocal('TOPOLOGY', `Topology reconstructed — ${id} reconnected to: ${(result.reconnected_to||[]).join(', ') || 'none'}`);
+    setTimeout(() => setPipelineStage('FOUND'), 450);
+    setTimeout(() => setPipelineStage('TOPOLOGY_REBUILD'), 600);
+  } else {
+    logLocal('SEARCHING', `${id} not yet found within search radius — helper still searching`);
+    setPipelineStage('SEARCHING');
+  }
+
+  // Optional: fetch full ranked helper candidates if the backend patch is applied.
+  fetchHelperCandidates(id, result.prediction.predicted_x, result.prediction.predicted_y);
+
+  pollOnce();
+  if (state.selectedId === id) renderDetail();
+  renderRecoveryPanels();
+}
+
+async function fetchHelperCandidates(id, px, py) {
+  try {
+    const candidates = await api('GET', `/network/nodes/${id}/helper-candidates?predicted_x=${px}&predicted_y=${py}`);
+    state.lostContext[id].candidates = candidates;
+  } catch (e) {
+    state.lostContext[id].candidates = null; // optional endpoint not present — fine
+  }
+  renderRecoveryPanels();
+}
+
+/* ---------------- Recovery timeline pipeline ---------------- */
+const PIPELINE_STAGES = [
+  ['ONLINE','Online'],
+  ['LOST','Comm. Lost'],
+  ['LAST_KNOWN','Last Known'],
+  ['PREDICTED','Prediction'],
+  ['SEARCH_AREA','Search Area'],
+  ['HELPER_SELECTED','Helper Sel.'],
+  ['ASTAR_SEARCH','A* Search'],
+  ['FOUND','Node Found'],
+  ['TOPOLOGY_REBUILD','Topology'],
+  ['DIJKSTRA_RESTORED','Route Restored'],
+  ['MESSAGE_DELIVERED','Msg Delivered'],
+];
+function setPipelineStage(stage) {
+  state.pipelineStage = stage;
+  if (stage === 'LOST') {
+    // last known is captured immediately together with loss
+    setTimeout(() => { if (state.pipelineStage === 'LOST') state.pipelineStage = 'LAST_KNOWN'; renderPipeline(); }, 250);
+  }
+  renderPipeline();
+}
+function renderPipeline() {
+  const idx = PIPELINE_STAGES.findIndex(s => s[0] === state.pipelineStage);
+  const wrap = $('#pipeline');
+  wrap.innerHTML = '';
+  PIPELINE_STAGES.forEach(([key, label], i) => {
+    const step = el('div', 'pipe-step');
+    let cls = '';
+    if (idx === -1 && key === 'ONLINE') cls = 'done';
+    else if (i < idx) cls = 'done';
+    else if (i === idx) cls = 'current';
+    step.className += cls ? ' ' + cls : '';
+    const icon = el('div', 'icon', cls === 'done' ? '\u2713' : (cls === 'current' ? '\u25CF' : '\u25CB'));
+    step.appendChild(icon);
+    step.appendChild(el('div', 'lbl', label));
+    wrap.appendChild(step);
+  });
+  $('#pipelineTag').textContent = state.pipelineStage === 'IDLE' ? 'idle' : state.pipelineStage.toLowerCase().replace(/_/g,' ');
+}
+
+/* ---------------- Recovery workflow panels ---------------- */
+function currentLostId() {
+  const lostNode = state.nodes.find(n => n.status === 'lost');
+  if (lostNode) return lostNode.node_id;
+  // fall back to most recently touched context whose node is now back online (post-recovery display)
+  const ids = Object.keys(state.lostContext);
+  return ids.length ? ids[ids.length - 1] : null;
+}
+
+function renderRecoveryPanels() {
+  const id = currentLostId();
+  const ctx = id ? state.lostContext[id] : null;
+  renderLostTracking(id, ctx);
+  renderHelperAndAStar(id, ctx);
+  renderDiscovery(id, ctx);
+}
+
+function renderLostTracking(id, ctx) {
+  const body = $('#lostTrackingBody');
+  if (!id || !ctx) {
+    body.innerHTML = '<div class="empty-note">No node is currently marked LOST. Move a node beyond communication range (10 units) to trigger detection.</div>';
+    return;
+  }
+  const node = state.nodes.find(n => n.node_id === id);
+  body.innerHTML = '';
+  body.appendChild(el('div', 'subhead', `\u26A0 NODE ${id} ${node && node.status === 'lost' ? 'LOST' : (ctx.status || '')}`));
+  if (ctx.lastKnown) {
+    body.appendChild(statLine('Last known X', ctx.lastKnown.x.toFixed(2)));
+    body.appendChild(statLine('Last known Y', ctx.lastKnown.y.toFixed(2)));
+    body.appendChild(statLine('Last known speed', ctx.lastKnown.speed));
+    body.appendChild(statLine('Last known direction', ctx.lastKnown.direction + '\u00B0'));
+  }
+  if (ctx.elapsedTime !== undefined) {
+    body.appendChild(statLine('Time since last contact (sim. units)', ctx.elapsedTime));
+  }
+  if (ctx.prediction) {
+    body.appendChild(el('div', 'subhead', 'PREDICTED LOCATION', ));
+    body.lastChild.style.marginTop = '10px';
+    body.appendChild(statLine('Predicted X', ctx.prediction.predicted_x.toFixed(2)));
+    body.appendChild(statLine('Predicted Y', ctx.prediction.predicted_y.toFixed(2)));
+    body.appendChild(statLine('Search radius', ctx.prediction.search_radius.toFixed(2) + ' units'));
+    body.appendChild(el('div', 'faint', 'Predicted search area — simulated uncertainty, not GPS accuracy.'));
+    body.lastChild.style.marginTop = '6px';
+    body.lastChild.style.fontSize = '10.5px';
+  }
+}
+
+function renderHelperAndAStar(id, ctx) {
+  const body = $('#helperSearchBody');
+  if (!id || !ctx || !ctx.helper) {
+    body.innerHTML = '<div class="empty-note">Recovery helper and A* search-route data will appear here once a lost-node recovery is run.</div>';
+    return;
+  }
+  body.innerHTML = '';
+  body.appendChild(el('div', 'subhead', 'RECOVERY HELPER SELECTION'));
+
+  if (ctx.candidates && ctx.candidates.length) {
+    const table = el('table', 'candidate-table');
+    table.innerHTML = '<thead><tr><th>Node</th><th>Dist.</th><th>Batt.</th><th>Signal</th><th>Score</th></tr></thead>';
+    const tbody = el('tbody');
+    ctx.candidates.forEach(c => {
+      const tr = el('tr', c.node_id === ctx.helper.node_id ? 'winner' : '');
+      tr.innerHTML = `<td>${c.node_id}</td><td>${c.distance.toFixed(1)}</td><td>${c.battery.toFixed(0)}%</td><td>${c.signal_strength.toFixed(0)}%</td><td>${c.score.toFixed(2)}</td>`;
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    body.appendChild(table);
+  } else {
+    body.appendChild(statLine('Selected helper', ctx.helper.node_id));
+    body.appendChild(statLine('Distance to search area', ctx.helper.distance.toFixed(2)));
+    body.appendChild(statLine('Battery', ctx.helper.battery.toFixed(0) + '%'));
+    body.appendChild(statLine('Signal strength', ctx.helper.signal_strength.toFixed(0) + '%'));
+    body.appendChild(statLine('Selection score (lower is better)', ctx.helper.score.toFixed(2)));
+    const note = el('div', 'faint', 'Full ranked candidate table needs the optional /helper-candidates backend patch — see README.');
+    note.style.fontSize = '10px'; note.style.marginTop = '4px';
+    body.appendChild(note);
+  }
+
+  const winnerLine = el('div', 'stat-line');
+  winnerLine.innerHTML = `<span>SELECTED HELPER</span><b class="marker-amber">${ctx.helper.node_id}</b>`;
+  body.appendChild(winnerLine);
+
+  body.appendChild(el('div', 'subhead', 'A* SEARCH — LOST NODE RECOVERY').outerHTML ? Object.assign(el('div','subhead','A* SEARCH — LOST NODE RECOVERY'), {style:{marginTop:'10px'}}) : el('div'));
+  const astarHead = body.lastChild; astarHead.style.marginTop = '10px';
+
+  if (ctx.search) {
+    body.appendChild(statLine('Helper', ctx.helper.node_id));
+    body.appendChild(statLine('Target', 'Predicted search area'));
+    const routeWrap = el('div');
+    routeWrap.appendChild(el('div', 'mini-label', 'A* SEARCH ROUTE'));
+    routeWrap.appendChild(routeChain(ctx.search.route, 'purple'));
+    body.appendChild(routeWrap);
+    const statusBadge = el('div');
+    statusBadge.style.marginTop = '8px';
+    const statusVal = ctx.discovery ? ctx.discovery.status : (ctx.search.travel_required ? 'SEARCHING' : 'WAITING');
+    const badgeCls = statusVal === 'FOUND' ? 'found' : (statusVal === 'NOT_FOUND' ? 'notfound' : 'searching');
+    statusBadge.innerHTML = `SEARCH STATUS: <span class="badge ${badgeCls}">${statusVal}</span>`;
+    body.appendChild(statusBadge);
+    state.aStarRoute = ctx.search.route;
+    renderMap();
+  }
+}
+
+function renderDiscovery(id, ctx) {
+  const body = $('#discoveryBody');
+  if (!id || !ctx || !ctx.discovery) {
+    body.innerHTML = '<div class="empty-note">Node rediscovery and mesh reconnection results will appear here once recovery completes.</div>';
+    return;
+  }
+  body.innerHTML = '';
+  const found = ctx.discovery.discovered;
+
+  const flow = el('div', 'discovery-flow');
+  const stages = ['LOST','SEARCHING','FOUND','ONLINE'];
+  const activeIdx = found ? 3 : 1;
+  stages.forEach((s, i) => {
+    if (i > 0) flow.appendChild(el('span','arrow','\u2192'));
+    flow.appendChild(el('span', 'step' + (i <= activeIdx ? ' active' : ''), s));
+  });
+  body.appendChild(el('div', 'subhead', `NODE ${id}`));
+  body.appendChild(flow);
+
+  if (found) {
+    body.appendChild(el('div', 'subhead', 'NODE REDISCOVERED').outerHTML ? Object.assign(el('div','subhead','NODE REDISCOVERED'),{style:{marginTop:'10px'}}) : el('div'));
+    body.lastChild.style.marginTop = '10px';
+    body.appendChild(statLine('Recovered position X', ctx.prediction.predicted_x.toFixed(2)));
+    body.appendChild(statLine('Recovered position Y', ctx.prediction.predicted_y.toFixed(2)));
+
+    body.appendChild(el('div', 'subhead', 'TOPOLOGY RECONSTRUCTION'));
+    body.lastChild.style.marginTop = '10px';
+    body.appendChild(el('div', 'faint', `Previously: ${id} DISCONNECTED`));
+    body.lastChild.style.fontSize = '11px';
+    if (ctx.reconnected && ctx.reconnected.length) {
+      const chips = el('div', 'chip-list');
+      chips.style.marginTop = '6px';
+      ctx.reconnected.forEach(nb => chips.appendChild(el('span', 'chip', `${id} \u2192 ${nb}`)));
+      body.appendChild(chips);
+    } else {
+      body.appendChild(el('div', 'faint', 'No neighbors within range after reconnect.'));
+    }
+  } else {
+    body.appendChild(el('div', 'faint', `Distance to search area: ${ctx.discovery.distance.toFixed(2)} (radius ${ctx.discovery.search_radius.toFixed(2)}). Try recovering again — the helper has not yet closed the gap.`));
+    body.lastChild.style.marginTop = '8px';
+  }
+}
+
+function statLine(label, value) {
+  const d = el('div', 'stat-line');
+  d.innerHTML = `<span class="dim">${label}</span><b>${value}</b>`;
+  return d;
+}
+function routeChain(route, color) {
+  const wrap = el('div', 'route-chain');
+  route.forEach((hop, i) => {
+    if (i > 0) wrap.appendChild(el('span', 'arrow', '\u2192'));
+    const cls = i === 0 ? 'src' : (i === route.length - 1 ? 'dst' : '');
+    const hopEl = el('span', 'hop ' + cls, hop);
+    if (color === 'purple') hopEl.style.borderColor = 'var(--purple)';
+    wrap.appendChild(hopEl);
+  });
+  return wrap;
+}
+
+/* ---------------- Dijkstra routing panel ---------------- */
+function populateNodeSelects() {
+  const ids = state.nodes.map(n => n.node_id);
+  for (const sel of [$('#routeSource'), $('#routeDest'), $('#msgSource'), $('#msgDest')]) {
+    const prev = sel.value;
+    sel.innerHTML = '';
+    ids.forEach(id => {
+      const opt = el('option'); opt.value = id; opt.textContent = id;
+      sel.appendChild(opt);
+    });
+    if (ids.includes(prev)) sel.value = prev;
+  }
+  if (!$('#routeDest').value && ids.length) $('#routeDest').value = ids[ids.length - 1];
+  if (!$('#msgDest').value && ids.length) $('#msgDest').value = ids[ids.length - 1];
+}
+
+async function findRoute() {
+  const src = $('#routeSource').value, dst = $('#routeDest').value;
+  const box = $('#routeResult');
+  if (!src || !dst) return;
+  try {
+    const result = await api('GET', `/network/route/${src}/${dst}`);
+    box.innerHTML = '';
+    box.appendChild(el('div', 'mini-label', 'DIJKSTRA ROUTE'));
+    box.appendChild(routeChain(result.route, 'cyan'));
+    state.dijkstraRoute = result.route;
+    logLocal('ROUTE', `Dijkstra route ${src} -> ${dst}: ${result.route.join(' -> ')}`);
+    setPipelineStage('DIJKSTRA_RESTORED');
+    renderMap();
+    renderHealth();
+  } catch (e) {
+    box.innerHTML = `<div class="banner err">No route available: ${e.message}</div>`;
+  }
+}
+
+/* ---------------- Messaging panel ---------------- */
+async function sendMessage() {
+  const src = $('#msgSource').value, dst = $('#msgDest').value;
+  const priority = $('#msgPriority').value;
+  const content = $('#msgContent').value.trim() || 'Emergency: requesting assistance.';
+  const box = $('#msgResult');
+  if (!src || !dst) return;
+  const messageId = 'MSG-' + Date.now().toString().slice(-6);
+  try {
+    const result = await api('POST', '/network/messages/send', {
+      message_id: messageId, source_id: src, destination_id: dst, content, priority,
+    });
+    box.innerHTML = '';
+    box.appendChild(el('div', 'banner ok', `MESSAGE DELIVERED — ${result.message_id}`));
+    box.appendChild(el('div', 'mini-label', 'ROUTE USED'));
+    box.appendChild(routeChain(result.route, 'cyan'));
+    state.lastMessageRoute = result.route;
+    logLocal('MESSAGE', `${priority.toUpperCase()} message ${result.message_id} delivered ${src} -> ${dst} via ${result.route.join(' -> ')}`);
+    setPipelineStage('MESSAGE_DELIVERED');
+    renderHealth();
+  } catch (e) {
+    box.innerHTML = `<div class="banner err">Delivery failed: ${e.message}${e.message.includes('HTTP 500') ? ' — apply the try/except patch in the README so this fails cleanly instead of a server error.' : ''}</div>`;
+  }
+}
+
+/* ---------------- Network map (SVG) ---------------- */
+function renderMap() {
+  const svg = $('#mapSvg');
+  const W = 900, H = 560, PAD = 70;
+  svg.innerHTML = '';
+  const ns = 'http://www.w3.org/2000/svg';
+  const nodes = state.nodes;
+  if (!nodes.length) return;
+
+  // bounding box across nodes + any prediction/search markers currently shown
+  let xs = nodes.map(n => n.x), ys = nodes.map(n => n.y);
+  const id = currentLostId(); const ctx = id ? state.lostContext[id] : null;
+  if (ctx && ctx.prediction) {
+    xs.push(ctx.prediction.predicted_x - ctx.prediction.search_radius, ctx.prediction.predicted_x + ctx.prediction.search_radius);
+    ys.push(ctx.prediction.predicted_y - ctx.prediction.search_radius, ctx.prediction.predicted_y + ctx.prediction.search_radius);
+  }
+  if (ctx && ctx.lastKnown) { xs.push(ctx.lastKnown.x); ys.push(ctx.lastKnown.y); }
+  let minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+  if (maxX - minX < 20) { const c=(maxX+minX)/2; minX=c-15; maxX=c+15; }
+  if (maxY - minY < 20) { const c=(maxY+minY)/2; minY=c-15; maxY=c+15; }
+  const spanX = maxX - minX, spanY = maxY - minY;
+
+  function sx(x) { return PAD + ((x - minX) / spanX) * (W - PAD * 2); }
+  function sy(y) { return H - PAD - ((y - minY) / spanY) * (H - PAD * 2); } // flip so +y is up
+
+  // background grid
+  const grid = document.createElementNS(ns, 'g');
+  for (let i = 0; i <= 10; i++) {
+    const gx = PAD + (i/10)*(W-PAD*2);
+    const l = document.createElementNS(ns,'line');
+    l.setAttribute('x1',gx); l.setAttribute('y1',PAD*0.3); l.setAttribute('x2',gx); l.setAttribute('y2',H-PAD*0.3);
+    l.setAttribute('stroke','#132225'); l.setAttribute('stroke-width','1');
+    grid.appendChild(l);
+    const gy = PAD*0.3 + (i/10)*(H-PAD*0.6);
+    const l2 = document.createElementNS(ns,'line');
+    l2.setAttribute('x1',PAD*0.5); l2.setAttribute('y1',gy); l2.setAttribute('x2',W-PAD*0.5); l2.setAttribute('y2',gy);
+    l2.setAttribute('stroke','#132225'); l2.setAttribute('stroke-width','1');
+    grid.appendChild(l2);
+  }
+  svg.appendChild(grid);
+
+  // connections
+  const connG = document.createElementNS(ns,'g');
+  const nodeById = Object.fromEntries(nodes.map(n => [n.node_id, n]));
+  const dRoute = state.dijkstraRoute || [];
+  const mRoute = state.lastMessageRoute || [];
+  const aRoute = (state.aStarRoute || []).filter(h => nodeById[h]); // exclude synthetic SEARCH_AREA label
+  const highlightRoute = mRoute.length ? mRoute : dRoute;
+
+  function isEdgeInRoute(a, b, route) {
+    for (let i = 0; i < route.length - 1; i++) {
+      if ((route[i] === a && route[i+1] === b) || (route[i] === b && route[i+1] === a)) return true;
+    }
+    return false;
+  }
+
+  (state.topology.connections || []).forEach(c => {
+    const a = nodeById[c.source], b = nodeById[c.target];
+    if (!a || !b) return;
+    const line = document.createElementNS(ns,'line');
+    line.setAttribute('x1', sx(a.x)); line.setAttribute('y1', sy(a.y));
+    line.setAttribute('x2', sx(b.x)); line.setAttribute('y2', sy(b.y));
+    if (isEdgeInRoute(c.source, c.target, highlightRoute)) {
+      line.setAttribute('stroke', 'var(--cyan)');
+      line.setAttribute('stroke-width', '3.2');
+      line.setAttribute('stroke-dasharray', '10 6');
+      line.style.animation = 'dashFlow 1.1s linear infinite';
+    } else {
+      line.setAttribute('stroke', '#1f6e5c');
+      line.setAttribute('stroke-width', '1.6');
+      line.setAttribute('opacity', '0.65');
+    }
+    connG.appendChild(line);
+  });
+
+  // A* search route (dashed purple), drawn as straight segments between real online nodes
+  for (let i = 0; i < aRoute.length - 1; i++) {
+    const a = nodeById[aRoute[i]], b = nodeById[aRoute[i+1]];
+    if (!a || !b) continue;
+    const line = document.createElementNS(ns,'line');
+    line.setAttribute('x1', sx(a.x)); line.setAttribute('y1', sy(a.y));
+    line.setAttribute('x2', sx(b.x)); line.setAttribute('y2', sy(b.y));
+    line.setAttribute('stroke', 'var(--purple)');
+    line.setAttribute('stroke-width', '2.6');
+    line.setAttribute('stroke-dasharray', '3 5');
+    connG.appendChild(line);
+  }
+  svg.appendChild(connG);
+
+  // last-known + prediction + search radius markers
+  if (ctx) {
+    if (ctx.lastKnown) {
+      const lx = sx(ctx.lastKnown.x), ly = sy(ctx.lastKnown.y);
+      const d = document.createElementNS(ns,'g');
+      const diamond = document.createElementNS(ns,'polygon');
+      diamond.setAttribute('points', `${lx},${ly-7} ${lx+7},${ly} ${lx},${ly+7} ${lx-7},${ly}`);
+      diamond.setAttribute('fill', 'none'); diamond.setAttribute('stroke', 'var(--amber)'); diamond.setAttribute('stroke-width','2');
+      d.appendChild(diamond);
+      const t = document.createElementNS(ns,'text');
+      t.setAttribute('x', lx+10); t.setAttribute('y', ly-8); t.setAttribute('fill','var(--amber)'); t.setAttribute('font-size','9.5'); t.setAttribute('font-family','var(--font-mono)');
+      t.textContent = 'LAST KNOWN';
+      d.appendChild(t);
+      svg.appendChild(d);
+    }
+    if (ctx.prediction) {
+      const px = sx(ctx.prediction.predicted_x), py = sy(ctx.prediction.predicted_y);
+      const rPix = (ctx.prediction.search_radius / spanX) * (W - PAD*2);
+      const circle = document.createElementNS(ns,'circle');
+      circle.setAttribute('cx', px); circle.setAttribute('cy', py); circle.setAttribute('r', Math.max(rPix,4));
+      circle.setAttribute('fill', 'rgba(181,139,240,0.08)'); circle.setAttribute('stroke','var(--purple)'); circle.setAttribute('stroke-width','1.6'); circle.setAttribute('stroke-dasharray','5 4');
+      svg.appendChild(circle);
+      const label = document.createElementNS(ns,'text');
+      label.setAttribute('x', px); label.setAttribute('y', py + Math.max(rPix,4) + 14);
+      label.setAttribute('fill', 'var(--purple)'); label.setAttribute('font-size','9'); label.setAttribute('text-anchor','middle'); label.setAttribute('font-family','var(--font-mono)');
+      label.textContent = 'PREDICTED SEARCH AREA';
+      svg.appendChild(label);
+      const cross = document.createElementNS(ns,'circle');
+      cross.setAttribute('cx', px); cross.setAttribute('cy', py); cross.setAttribute('r', 5);
+      cross.setAttribute('fill', 'var(--purple)');
+      svg.appendChild(cross);
+      const pulse = document.createElementNS(ns,'circle');
+      pulse.setAttribute('cx', px); pulse.setAttribute('cy', py); pulse.setAttribute('r', 6);
+      pulse.setAttribute('fill','none'); pulse.setAttribute('stroke','var(--purple)'); pulse.setAttribute('stroke-width','1.5');
+      pulse.style.animation = 'ringPulse 1.6s ease-out infinite';
+      svg.appendChild(pulse);
+    }
+  }
+
+  // node glyphs
+  nodes.forEach(n => {
+    const cx = sx(n.x), cy = sy(n.y);
+    const g = document.createElementNS(ns,'g');
+    g.style.cursor = 'pointer';
+    g.addEventListener('click', () => selectNode(n.node_id));
+
+    const color = n.status === 'online' ? 'var(--op-green)' : (n.status === 'lost' ? 'var(--amber)' : 'var(--red)');
+
+    if (state.selectedId === n.node_id) {
+      const ring = document.createElementNS(ns,'circle');
+      ring.setAttribute('cx', cx); ring.setAttribute('cy', cy); ring.setAttribute('r', 20);
+      ring.setAttribute('fill','none'); ring.setAttribute('stroke', color); ring.setAttribute('stroke-width','1.4'); ring.setAttribute('opacity','0.8');
+      g.appendChild(ring);
+    }
+
+    const shape = nodeShape(ns, n.type, cx, cy, color, n.status === 'lost');
+    g.appendChild(shape);
+
+    const label = document.createElementNS(ns,'text');
+    label.setAttribute('x', cx); label.setAttribute('y', cy - 16);
+    label.setAttribute('text-anchor','middle'); label.setAttribute('fill', n.status === 'offline' ? '#8a9a9c' : '#e8f5f2');
+    label.setAttribute('font-size','11'); label.setAttribute('font-weight','700'); label.setAttribute('font-family','var(--font-mono)');
+    label.textContent = n.node_id;
+    g.appendChild(label);
+
+    const sub = document.createElementNS(ns,'text');
+    sub.setAttribute('x', cx); sub.setAttribute('y', cy + 24);
+    sub.setAttribute('text-anchor','middle'); sub.setAttribute('fill', '#6d8385');
+    sub.setAttribute('font-size','9'); sub.setAttribute('font-family','var(--font-mono)');
+    sub.textContent = n.status === 'lost' ? 'LOST' : (NODE_TYPE_META[n.type]||{}).label || n.type;
+    g.appendChild(sub);
+
+    svg.appendChild(g);
+  });
+}
+
+function nodeShape(ns, type, cx, cy, color, pulsing) {
+  const wrap = document.createElementNS(ns, 'g');
+  const s = 11;
+  let shape;
+  switch (type) {
+    case 'drone':
+      shape = document.createElementNS(ns,'polygon');
+      shape.setAttribute('points', `${cx},${cy-s} ${cx+s},${cy} ${cx},${cy+s} ${cx-s},${cy}`);
+      break;
+    case 'command_center':
+      shape = document.createElementNS(ns,'rect');
+      shape.setAttribute('x', cx-s); shape.setAttribute('y', cy-s); shape.setAttribute('width', s*2); shape.setAttribute('height', s*2);
+      shape.setAttribute('rx','2');
+      break;
+    case 'fire_rescue':
+      shape = document.createElementNS(ns,'polygon');
+      shape.setAttribute('points', hexPoints(cx,cy,s));
+      break;
+    case 'police':
+      shape = document.createElementNS(ns,'polygon');
+      shape.setAttribute('points', `${cx},${cy-s} ${cx+s*0.95},${cy-s*0.3} ${cx+s*0.6},${cy+s} ${cx-s*0.6},${cy+s} ${cx-s*0.95},${cy-s*0.3}`);
+      break;
+    case 'ambulance':
+      shape = document.createElementNS(ns,'circle');
+      shape.setAttribute('cx', cx); shape.setAttribute('cy', cy); shape.setAttribute('r', s*0.95);
+      break;
+    default: // rescue_team
+      shape = document.createElementNS(ns,'polygon');
+      shape.setAttribute('points', `${cx},${cy-s} ${cx+s},${cy+s*0.8} ${cx-s},${cy+s*0.8}`);
+  }
+  shape.setAttribute('fill', color + '');
+  shape.setAttribute('fill-opacity', pulsing ? '0.85' : '0.9');
+  shape.setAttribute('stroke', '#04120e');
+  shape.setAttribute('stroke-width', '1.5');
+  if (pulsing) shape.style.animation = 'pulseDot 1.2s infinite';
+  wrap.appendChild(shape);
+  return wrap;
+}
+function hexPoints(cx, cy, r) {
+  let pts = [];
+  for (let i = 0; i < 6; i++) {
+    const a = Math.PI/3 * i - Math.PI/6;
+    pts.push(`${cx + r*Math.cos(a)},${cy + r*Math.sin(a)}`);
+  }
+  return pts.join(' ');
+}
+
+/* ---------------- Reset ---------------- */
+async function resetNetwork() {
+  try {
+    await api('POST', '/network/reset');
+    state.lostContext = {};
+    state.dijkstraRoute = null; state.aStarRoute = null; state.lastMessageRoute = null;
+    state.pipelineStage = 'IDLE';
+    logLocal('INFO', 'Network reset to initial topology');
+    showBanner('ok', 'Network reset to initial topology.', 3000);
+    await pollOnce();
+    renderPipeline(); renderRecoveryPanels();
+  } catch (e) {
+    showBanner('warn', `Reset endpoint not available on this backend (${e.message}). Apply the /network/reset patch from the README, or manually fail/recover/move nodes back.`, 8000);
+  }
+}
+
+/* ---------------- Demo sequence ---------------- */
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+async function waitWhilePaused() {
+  while (state.demo.paused && !state.demo.cancelled) await sleep(200);
+}
+async function runDemo() {
+  if (state.demo.running) return;
+  state.demo.running = true; state.demo.paused = false; state.demo.cancelled = false;
+  $('#demoBtn').textContent = '⏳ Demo running…';
+  $('#demoBtn').disabled = true;
+  $('#demoPauseBtn').style.display = 'inline-block';
+  $('#demoPauseBtn').textContent = 'Pause';
+
+  const target = state.nodes.find(n => n.node_id === 'R02') || state.nodes.find(n => n.status === 'online');
+  if (!target) { finishDemo(); return; }
+  const dest = state.nodes.find(n => n.node_id === 'C01') || state.nodes.find(n => n.node_id !== target.node_id);
+
+  try {
+    showBanner('ok', `Demo: moving ${target.node_id} out of communication range…`, 3000);
+    await waitWhilePaused(); if (state.demo.cancelled) return finishDemo();
+    await moveNode(target.node_id, target.x + 60, target.y + 60);
+    await sleep(1200);
+
+    await waitWhilePaused(); if (state.demo.cancelled) return finishDemo();
+    const stillLost = state.nodes.find(n => n.node_id === target.node_id && n.status === 'lost');
+    if (!stillLost) {
+      showBanner('warn', `${target.node_id} did not go LOST from that move (still within range) — try Move Node manually with a larger offset.`, 6000);
+      return finishDemo();
+    }
+    showBanner('ok', `${target.node_id} confirmed LOST. Running recovery (prediction \u2192 helper \u2192 A* search)…`, 3000);
+    await sleep(900);
+
+    await waitWhilePaused(); if (state.demo.cancelled) return finishDemo();
+    await recoverLostNode(target.node_id, 4);
+    await sleep(1400);
+
+    await waitWhilePaused(); if (state.demo.cancelled) return finishDemo();
+    if (dest) {
+      $('#routeSource').value = target.node_id; $('#routeDest').value = dest.node_id;
+      await findRoute();
+      await sleep(1000);
+    }
+
+    await waitWhilePaused(); if (state.demo.cancelled) return finishDemo();
+    if (dest) {
+      $('#msgSource').value = target.node_id; $('#msgDest').value = dest.node_id;
+      $('#msgPriority').value = 'critical';
+      $('#msgContent').value = `Emergency: ${target.node_id} requesting assistance.`;
+      await sendMessage();
+    }
+    showBanner('ok', 'Demo sequence complete.', 4000);
+  } finally {
+    finishDemo();
+  }
+}
+function finishDemo() {
+  state.demo.running = false;
+  $('#demoBtn').textContent = '▶ Run Recovery Demo';
+  $('#demoBtn').disabled = false;
+  $('#demoPauseBtn').style.display = 'none';
+}
+
+/* ---------------- Render all ---------------- */
+function renderAll() {
+  renderHealth();
+  renderNodeList();
+  renderMap();
+  renderDetail();
+  populateNodeSelects();
+  renderRecoveryPanels();
+  renderPipeline();
+}
+
+/* ---------------- Wire up events ---------------- */
+$('#apiSaveBtn').addEventListener('click', () => {
+  state.apiBase = $('#apiBaseInput').value.trim().replace(/\/$/, '');
+  try { localStorage.setItem('resqmesh_api', state.apiBase); } catch (e) {}
+  startPolling();
+});
+$('#apiBaseInput').value = state.apiBase;
+$('#resetBtn').addEventListener('click', resetNetwork);
+$('#routeGoBtn').addEventListener('click', findRoute);
+$('#msgSendBtn').addEventListener('click', sendMessage);
+$('#demoBtn').addEventListener('click', runDemo);
+$('#demoPauseBtn').addEventListener('click', () => {
+  state.demo.paused = !state.demo.paused;
+  $('#demoPauseBtn').textContent = state.demo.paused ? 'Resume' : 'Pause';
+});
+
+renderPipeline();
+startPolling();
+</script>
+</body>
+</html>

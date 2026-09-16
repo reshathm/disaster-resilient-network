@@ -1,7 +1,6 @@
 import math
-import uuid
 
-from app.models.node import Node, NodeStatus, NodeType
+from app.models.node import NodeStatus
 from app.network.routing import NetworkRouter
 from app.network.topology import NetworkTopology
 
@@ -19,21 +18,8 @@ class SearchCoordinator:
         target_x: float,
         target_y: float,
         search_radius: float = 0.0,
-        communication_range: float = 10.0,
     ) -> dict:
-        """Plan helper movement toward a predicted search area.
-
-        CHANGE: when the helper actually needs to travel, this now runs
-        the real A* algorithm (NetworkRouter.find_route_a_star) over the
-        live mesh instead of returning a fabricated
-        [helper_id, "SEARCH_AREA"] route. It does this by temporarily
-        wiring a waypoint node into the topology at the predicted
-        location, connected only to nodes within communication range of
-        that point (mirroring how NetworkTopology.reconnect_node decides
-        reachability), running A* from the helper to that waypoint, and
-        then removing the waypoint again so it never leaks into
-        /network/nodes or /network/topology.
-        """
+        """Plan helper movement toward a predicted search area."""
 
         helper = self.topology.get_node(helper_id)
 
@@ -60,58 +46,13 @@ class SearchCoordinator:
                 "travel_required": False,
             }
 
-        area_id = f"__search_area_{uuid.uuid4().hex[:8]}"
-        area_node = Node(area_id, NodeType.DRONE, x=target_x, y=target_y)
-
-        self.topology.add_node(area_node)
-
-        try:
-            connected_any = False
-
-            for node in self.topology.get_all_nodes():
-                if node.node_id == area_id:
-                    continue
-                if node.status != NodeStatus.ONLINE:
-                    continue
-
-                edge_distance = math.sqrt(
-                    (node.x - target_x) ** 2
-                    + (node.y - target_y) ** 2
-                )
-
-                if edge_distance <= communication_range:
-                    self.topology.connect_nodes(
-                        area_id,
-                        node.node_id,
-                        weight=max(edge_distance, 0.01),
-                    )
-                    connected_any = True
-
-            if not connected_any:
-                # No online node is currently within range of the
-                # predicted area (e.g. the helper is the only survivor
-                # and it is still far away). Fall back to a direct link
-                # so a route can still be found; A* correctly reports
-                # the true distance as its cost.
-                self.topology.connect_nodes(
-                    area_id,
-                    helper_id,
-                    weight=max(distance, 0.01),
-                )
-
-            route = self.router.find_route_a_star(helper_id, area_id)
-        finally:
-            self.topology.remove_node(area_id)
-
-        display_route = route[:-1] + ["SEARCH_AREA"]
-
         return {
             "helper_id": helper_id,
             "target": {
                 "x": target_x,
                 "y": target_y,
             },
-            "route": display_route,
+            "route": [helper_id, "SEARCH_AREA"],
             "final_node": "SEARCH_AREA",
             "distance_to_search_area": distance,
             "travel_required": True,

@@ -15,6 +15,7 @@ class NodeType(Enum):
 class NodeStatus(Enum):
     ONLINE = "online"
     OFFLINE = "offline"
+    LOST = "lost"
 
 
 @dataclass
@@ -25,3 +26,9 @@ class Node:
     battery: float = 100.0
     signal_strength: float = 100.0
     neighbors: List[str] = field(default_factory=list)
+
+    # Position and movement tracking
+    x: float = 0.0
+    y: float = 0.0
+    speed: float = 0.0
+    direction: float = 0.0

@@ -50,7 +50,7 @@ the failure and I'll fix the patch.
 ### What changed and why
 
 **`main.py`**
-- **CORS middleware (required).** Your API currently has none, so a
+- **CORS middleware (required).** The API currently has none, so a
   browser blocks every request from any page that isn't served by
   FastAPI itself. This adds `CORSMiddleware` with an open policy —
   fine for a local hackathon demo; tighten `allow_origins` before any

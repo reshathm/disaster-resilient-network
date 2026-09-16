@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from app.models.message import Message, MessagePriority
@@ -16,6 +17,14 @@ from app.simulation.simulator import NetworkSimulator
 app = FastAPI(
     title="Disaster-Resilient Emergency Communication Network",
     version="1.0.0",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 

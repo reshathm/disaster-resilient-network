@@ -1269,8 +1269,27 @@ function renderMap() {
   }
   if (ctx && ctx.lastKnown) { xs.push(ctx.lastKnown.x); ys.push(ctx.lastKnown.y); }
   let minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
-  if (maxX - minX < 20) { const c=(maxX+minX)/2; minX=c-15; maxX=c+15; }
-  if (maxY - minY < 20) { const c=(maxY+minY)/2; minY=c-15; maxY=c+15; }
+
+  // Keep the map viewport stable during the recovery demo.
+  // This prevents the whole network from resizing when R02 changes
+  // between LOST and ONLINE states.
+  if (state.demo.running) {
+    minX = -8;
+    maxX = 40;
+    minY = -10;
+    maxY = 15;
+  } else {
+    const rawSpanX = Math.max(maxX - minX, 20);
+    const rawSpanY = Math.max(maxY - minY, 20);
+    const marginX = Math.max(rawSpanX * 0.16, 8);
+    const marginY = Math.max(rawSpanY * 0.16, 8);
+
+    minX -= marginX;
+    maxX += marginX;
+    minY -= marginY;
+    maxY += marginY;
+  }
+
   const spanX = maxX - minX, spanY = maxY - minY;
 
   function sx(x) { return PAD + ((x - minX) / spanX) * (W - PAD * 2); }
@@ -1497,10 +1516,10 @@ async function runDemo() {
   const dest = state.nodes.find(n => n.node_id === 'C01') || state.nodes.find(n => n.node_id !== target.node_id);
 
   try {
-    showBanner('ok', `Demo: moving ${target.node_id} out of communication range…`, 3000);
+    showBanner('ok', `STEP 1/9 — Moving ${target.node_id} out of communication range…`, 3500);
     await waitWhilePaused(); if (state.demo.cancelled) return finishDemo();
-    await moveNode(target.node_id, target.x + 60, target.y + 60);
-    await sleep(1200);
+    await moveNode(target.node_id, 32, 0);
+    await sleep(1800);
 
     await waitWhilePaused(); if (state.demo.cancelled) return finishDemo();
     const stillLost = state.nodes.find(n => n.node_id === target.node_id && n.status === 'lost');
@@ -1508,26 +1527,54 @@ async function runDemo() {
       showBanner('warn', `${target.node_id} did not go LOST from that move (still within range) — try Move Node manually with a larger offset.`, 6000);
       return finishDemo();
     }
-    showBanner('ok', `${target.node_id} confirmed LOST. Running recovery (prediction \u2192 helper \u2192 A* search)…`, 3000);
-    await sleep(900);
+
+    showBanner('ok', `STEP 2/9 — ${target.node_id} CONFIRMED LOST`, 3500);
+    setPipelineStage('LAST_KNOWN');
+    await sleep(1800);
 
     await waitWhilePaused(); if (state.demo.cancelled) return finishDemo();
-    await recoverLostNode(target.node_id, 4);
-    await sleep(1400);
+    showBanner('ok', 'STEP 3/9 — Predicting the lost node search area…', 3500);
+    setPipelineStage('PREDICTED');
+    await sleep(1800);
+
+    await waitWhilePaused(); if (state.demo.cancelled) return finishDemo();
+    showBanner('ok', 'STEP 4/9 — Selecting the best surviving recovery helper…', 3500);
+    await recoverLostNode(target.node_id, 1);
+    setPipelineStage('HELPER_SELECTED');
+    await sleep(2200);
+
+    await waitWhilePaused(); if (state.demo.cancelled) return finishDemo();
+    showBanner('ok', 'STEP 5/9 — A* is routing the helper toward the search area…', 3500);
+    setPipelineStage('ASTAR_SEARCH');
+    await sleep(2200);
+
+    await waitWhilePaused(); if (state.demo.cancelled) return finishDemo();
+    showBanner('ok', `STEP 6/9 — ${target.node_id} rediscovered.`, 3500);
+    setPipelineStage('FOUND');
+    await sleep(2200);
+
+    await waitWhilePaused(); if (state.demo.cancelled) return finishDemo();
+    showBanner('ok', 'STEP 7/9 — Rebuilding the mesh topology…', 3500);
+    setPipelineStage('TOPOLOGY_REBUILD');
+    await pollOnce();
+    await sleep(2200);
 
     await waitWhilePaused(); if (state.demo.cancelled) return finishDemo();
     if (dest) {
+      showBanner('ok', `STEP 8/9 — Restoring Dijkstra route ${target.node_id} → ${dest.node_id}…`, 3500);
       $('#routeSource').value = target.node_id; $('#routeDest').value = dest.node_id;
       await findRoute();
-      await sleep(1000);
+      await sleep(2200);
     }
 
     await waitWhilePaused(); if (state.demo.cancelled) return finishDemo();
     if (dest) {
+      showBanner('ok', 'STEP 9/9 — Delivering emergency message through the restored mesh…', 3500);
       $('#msgSource').value = target.node_id; $('#msgDest').value = dest.node_id;
       $('#msgPriority').value = 'critical';
       $('#msgContent').value = `Emergency: ${target.node_id} requesting assistance.`;
       await sendMessage();
+      await sleep(2500);
     }
     showBanner('ok', 'Demo sequence complete.', 4000);
   } finally {

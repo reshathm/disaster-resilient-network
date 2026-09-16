@@ -100,6 +100,21 @@ def fail_node(node_id: str) -> dict:
         "status": "offline",
     }
 
+@app.post("/network/nodes/{node_id}/recover")
+def recover_node(node_id: str) -> dict:
+    """Simulate a network node recovering."""
+    try:
+        simulator.recover_node(node_id)
+    except ValueError as error:
+        return {
+            "error": str(error),
+        }
+
+    return {
+        "node_id": node_id,
+        "status": "online",
+    }
+
 @app.get("/network/route/{source_id}/{destination_id}")
 def network_route(source_id: str, destination_id: str) -> dict:
     """Find the current route between two network nodes."""

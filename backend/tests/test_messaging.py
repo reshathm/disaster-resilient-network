@@ -2,6 +2,7 @@ import pytest
 
 from app.models.message import Message, MessagePriority
 from app.models.node import Node, NodeType
+from app.network.event_log import EventLog
 from app.network.messaging import MessageService
 from app.network.topology import NetworkTopology
 from app.simulation.simulator import NetworkSimulator
@@ -30,7 +31,8 @@ def create_network() -> NetworkTopology:
 
 def test_send_message():
     network = create_network()
-    service = MessageService(network)
+    event_log = EventLog()
+    service = MessageService(network, event_log)
 
     message = Message(
         "M001",
@@ -46,10 +48,17 @@ def test_send_message():
         "R03",
     ]
 
+    events = event_log.get_events()
+
+    assert len(events) == 1
+    assert events[0].event_type == "MESSAGE_DELIVERED"
+    assert events[0].message == "M001 delivered via R01 -> R02 -> R03"
+
 
 def test_message_uses_alternate_route_after_failure():
     network = create_network()
-    service = MessageService(network)
+    event_log = EventLog()
+    service = MessageService(network, event_log)
     simulator = NetworkSimulator(network)
 
     simulator.fail_node("R02")
@@ -71,7 +80,8 @@ def test_message_uses_alternate_route_after_failure():
 
 def test_message_fails_when_no_route_exists():
     network = create_network()
-    service = MessageService(network)
+    event_log = EventLog()
+    service = MessageService(network, event_log)
     simulator = NetworkSimulator(network)
 
     simulator.fail_node("R02")

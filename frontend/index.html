@@ -814,19 +814,28 @@ function renderDetail() {
   body.appendChild(barBlock('BATTERY', node.battery));
   body.appendChild(barBlock('SIGNAL STRENGTH (simulated)', node.signal_strength));
 
+  const neighbors = (state.topology.connections || [])
+    .filter(link => link.source === node.node_id || link.target === node.node_id)
+    .map(link => link.source === node.node_id ? link.target : link.source);
+
+  const activeNeighbors = [...new Set(neighbors)].filter(id =>
+    state.nodes.some(n => n.node_id === id && n.status === 'online')
+  );
+
   const neighborsWrap = el('div');
   neighborsWrap.appendChild(el('div', 'mini-label', 'NEIGHBORS'));
   const chips = el('div', 'chip-list');
-  if (node.neighbors && node.neighbors.length) {
-    node.neighbors.forEach(nb => chips.appendChild(el('span', 'chip', nb)));
+  if (activeNeighbors.length) {
+    activeNeighbors.forEach(nb => chips.appendChild(el('span', 'chip', nb)));
   } else {
     chips.appendChild(el('span', 'chip', 'none'));
   }
   neighborsWrap.appendChild(chips);
   body.appendChild(neighborsWrap);
 
+  const connected = node.status === 'online' && activeNeighbors.length > 0;
   const connState = el('div', 'health-line');
-  connState.innerHTML = `<span class="dim">Connection state</span><b>${(node.neighbors && node.neighbors.length) ? 'Connected' : 'Disconnected'}</b>`;
+  connState.innerHTML = `<span class="dim">Connection state</span><b>${connected ? 'Connected' : 'Disconnected'}</b>`;
   body.appendChild(connState);
 
   // Actions

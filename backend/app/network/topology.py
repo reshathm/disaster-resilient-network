@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import math
 from typing import Dict, List, Optional
 
 from app.models.node import NodeStatus
@@ -46,7 +47,7 @@ class NetworkTopology:
         weight: float = 1.0,
     ) -> None:
         """Create a two-way weighted connection."""
-        if weight <= 0:
+        if not math.isfinite(weight) or weight <= 0:
             raise ValueError("Connection weight must be greater than zero.")
 
         first_node = self._get_node(first_id)
@@ -76,34 +77,46 @@ class NetworkTopology:
             second_node.neighbors.remove(first_id)
 
     def refresh_connections(self, communication_range: float) -> None:
-        """Remove connections between nodes that are now out of range."""
+        """Refresh physical links between online nodes."""
         import math
 
         if communication_range <= 0:
             raise ValueError("Communication range must be greater than zero.")
 
-        checked_pairs = set()
-
+        # Remove connections that are outside communication range.
         for first_id in list(self.connections):
             for second_id in list(self.connections[first_id]):
-                pair = tuple(sorted((first_id, second_id)))
-
-                if pair in checked_pairs:
-                    continue
-
-                checked_pairs.add(pair)
-
                 first_node = self.nodes[first_id]
                 second_node = self.nodes[second_id]
 
-                distance = math.sqrt(
-                    (first_node.x - second_node.x) ** 2
-                    + (first_node.y - second_node.y) ** 2
+                distance = math.hypot(
+                    first_node.x - second_node.x,
+                    first_node.y - second_node.y,
                 )
 
                 if distance > communication_range:
                     self.disconnect_nodes(first_id, second_id)
 
+        # Restore links only between online nodes within range.
+        online_nodes = [
+            node
+            for node in self.get_all_nodes()
+            if node.status == NodeStatus.ONLINE
+        ]
+
+        for index, first_node in enumerate(online_nodes):
+            for second_node in online_nodes[index + 1:]:
+                distance = math.hypot(
+                    first_node.x - second_node.x,
+                    first_node.y - second_node.y,
+                )
+
+                if distance <= communication_range:
+                    if second_node.node_id not in self.connections[first_node.node_id]:
+                        self.connect_nodes(
+                            first_node.node_id,
+                            second_node.node_id,
+                        )
     def reconnect_node(
         self,
         node_id: str,

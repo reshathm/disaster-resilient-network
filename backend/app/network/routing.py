@@ -44,7 +44,7 @@ class NetworkRouter:
             if current_node is None:
                 continue
 
-            if current_node.status == NodeStatus.OFFLINE:
+            if current_node.status != NodeStatus.ONLINE:
                 continue
 
             for neighbor_id, weight in self.topology.get_neighbors(
@@ -56,7 +56,7 @@ class NetworkRouter:
                 if neighbor is None:
                     continue
 
-                if neighbor.status == NodeStatus.OFFLINE:
+                if neighbor.status != NodeStatus.ONLINE:
                     continue
 
                 new_distance = current_distance + weight
@@ -124,7 +124,7 @@ class NetworkRouter:
             if current_node is None:
                 continue
 
-            if current_node.status == NodeStatus.OFFLINE:
+            if current_node.status != NodeStatus.ONLINE:
                 continue
 
             for neighbor_id, weight in self.topology.get_neighbors(
@@ -136,7 +136,7 @@ class NetworkRouter:
                 if neighbor is None:
                     continue
 
-                if neighbor.status == NodeStatus.OFFLINE:
+                if neighbor.status != NodeStatus.ONLINE:
                     continue
 
                 new_distance = current_distance + weight
@@ -191,12 +191,39 @@ class NetworkRouter:
         return self._calculate_route_cost(route)
 
     def _heuristic(self, first_node, second_node) -> float:
-        """Calculate Euclidean distance between two nodes."""
+        """Estimate remaining cost without overestimating edge weights."""
 
-        return math.sqrt(
-            (first_node.x - second_node.x) ** 2
-            + (first_node.y - second_node.y) ** 2
+        minimum_ratio = float("inf")
+
+        for node in self.topology.get_all_nodes():
+            for neighbor_id, weight in self.topology.get_neighbors(
+                node.node_id
+            ).items():
+                neighbor = self.topology.get_node(neighbor_id)
+
+                if neighbor is None:
+                    continue
+
+                distance = math.hypot(
+                    node.x - neighbor.x,
+                    node.y - neighbor.y,
+                )
+
+                if distance > 0:
+                    minimum_ratio = min(
+                        minimum_ratio,
+                        weight / distance,
+                    )
+
+        if minimum_ratio == float("inf"):
+            return 0.0
+
+        distance_to_destination = math.hypot(
+            first_node.x - second_node.x,
+            first_node.y - second_node.y,
         )
+
+        return distance_to_destination * minimum_ratio
 
     def _calculate_route_cost(self, route: List[str]) -> float:
         """Calculate the total weight of a route."""
@@ -246,8 +273,8 @@ class NetworkRouter:
         if destination is None:
             raise ValueError(f"Node '{destination_id}' does not exist.")
 
-        if source.status == NodeStatus.OFFLINE:
+        if source.status != NodeStatus.ONLINE:
             raise ValueError(f"Node '{source_id}' is offline.")
 
-        if destination.status == NodeStatus.OFFLINE:
+        if destination.status != NodeStatus.ONLINE:
             raise ValueError(f"Node '{destination_id}' is offline.")

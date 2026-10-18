@@ -196,3 +196,71 @@ def test_lost_node_recovery_via_api():
 
         finally:
             client.post("/network/reset")
+
+
+def test_recovery_status_via_api():
+    """Verify recovery status before and after finding R02."""
+    with TestClient(app) as client:
+        try:
+            assert client.post("/network/reset").status_code == 200
+
+            moved = client.post(
+                "/network/nodes/R02/move",
+                json={"x": 32.0, "y": 0.0},
+            )
+            assert moved.status_code == 200
+            assert moved.json()["lost_detected"] is True
+
+            status = client.get("/network/nodes/R02/recovery")
+            assert status.status_code == 200
+            assert status.json()["node_id"] == "R02"
+            assert status.json()["status"] == "LOST"
+
+            recovered = client.post(
+                "/network/nodes/R02/recover-lost",
+                json={"elapsed_time": 3.0},
+            )
+            assert recovered.status_code == 200
+            assert recovered.json()["status"] == "FOUND"
+
+            status = client.get("/network/nodes/R02/recovery")
+            assert status.status_code == 200
+            assert status.json()["node_id"] == "R02"
+            assert status.json()["status"] == "FOUND"
+
+        finally:
+            client.post("/network/reset")
+
+
+def test_helper_candidates_via_api():
+    """Verify online helpers are ranked for R02's predicted location."""
+    with TestClient(app) as client:
+        try:
+            assert client.post("/network/reset").status_code == 200
+
+            moved = client.post(
+                "/network/nodes/R02/move",
+                json={"x": 32.0, "y": 0.0},
+            )
+            assert moved.status_code == 200
+            assert moved.json()["lost_detected"] is True
+
+            response = client.get(
+                "/network/nodes/R02/helper-candidates",
+                params={"predicted_x": 17.0, "predicted_y": 0.0},
+            )
+            assert response.status_code == 200
+
+            candidates = response.json()
+            assert isinstance(candidates, list)
+            assert [c["node_id"] for c in candidates] == [
+                "C01", "R03", "R04", "R01"
+            ]
+            assert [c["distance"] for c in candidates] == [
+                2.0, 7.0, 13.0, 17.0
+            ]
+            assert all(c["node_id"] != "R02" for c in candidates)
+            assert all(c["battery"] >= 0 for c in candidates)
+
+        finally:
+            client.post("/network/reset")

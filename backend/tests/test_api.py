@@ -264,3 +264,70 @@ def test_helper_candidates_via_api():
 
         finally:
             client.post("/network/reset")
+
+
+def test_route_lookup_via_api():
+    """Verify route lookup and handling of an offline destination."""
+    with TestClient(app) as client:
+        try:
+            assert client.post("/network/reset").status_code == 200
+
+            response = client.get("/network/route/R01/C01")
+            assert response.status_code == 200
+            assert response.json() == {
+                "source": "R01",
+                "destination": "C01",
+                "route": ["R01", "C01"],
+            }
+
+            failed = client.post("/network/nodes/R02/fail")
+            assert failed.status_code == 200
+            assert failed.json()["status"] == "offline"
+
+            response = client.get("/network/route/R01/C01")
+            assert response.status_code == 200
+            assert response.json()["route"] == ["R01", "C01"]
+
+            response = client.get("/network/route/R01/R02")
+            assert response.status_code == 200
+            assert response.json() == {
+                "source": "R01",
+                "destination": "R02",
+                "error": "Node 'R02' is offline.",
+            }
+
+        finally:
+            client.post("/network/reset")
+
+
+def test_message_failure_via_api():
+    """Verify a critical message fails when its destination is offline."""
+    with TestClient(app) as client:
+        try:
+            assert client.post("/network/reset").status_code == 200
+
+            failed = client.post("/network/nodes/R02/fail")
+            assert failed.status_code == 200
+
+            response = client.post(
+                "/network/messages/send",
+                json={
+                    "message_id": "API-FAIL-001",
+                    "source_id": "R01",
+                    "destination_id": "R02",
+                    "content": "Emergency assistance required",
+                    "priority": "critical",
+                },
+            )
+
+            assert response.status_code == 200
+            assert response.json() == {
+                "message_id": "API-FAIL-001",
+                "source": "R01",
+                "destination": "R02",
+                "status": "failed",
+                "error": "Node 'R02' is offline.",
+            }
+
+        finally:
+            client.post("/network/reset")

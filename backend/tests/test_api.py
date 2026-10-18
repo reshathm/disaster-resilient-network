@@ -73,3 +73,76 @@ def test_node_recovery_after_reset():
 
         finally:
             client.post("/network/reset")
+
+
+def test_message_delivery_via_api():
+    """A message should be delivered through the HTTP API."""
+
+    with TestClient(app) as client:
+        try:
+            assert client.post("/network/reset").status_code == 200
+
+            response = client.post(
+                "/network/messages/send",
+                json={
+                    "message_id": "API-M001",
+                    "source_id": "R01",
+                    "destination_id": "C01",
+                    "content": "Emergency evacuation required",
+                    "priority": "critical",
+                },
+            )
+
+            assert response.status_code == 200
+
+            result = response.json()
+
+            assert result["message_id"] == "API-M001"
+            assert result["status"] == "delivered"
+            assert result["priority"] == "critical"
+            assert result["source"] == "R01"
+            assert result["destination"] == "C01"
+            assert result["route"][0] == "R01"
+            assert result["route"][-1] == "C01"
+
+        finally:
+            client.post("/network/reset")
+
+
+def test_node_movement_via_api():
+    """Moving a node should update its position through the API."""
+
+    with TestClient(app) as client:
+        try:
+            assert client.post("/network/reset").status_code == 200
+
+            response = client.post(
+                "/network/nodes/R02/move",
+                json={
+                    "x": 5.0,
+                    "y": 5.0,
+                },
+            )
+
+            assert response.status_code == 200
+
+            result = response.json()
+
+            assert result["node_id"] == "R02"
+            assert result["x"] == 5.0
+            assert result["y"] == 5.0
+            assert result["lost_detected"] is False
+
+            nodes = client.get("/network/nodes")
+            assert nodes.status_code == 200
+
+            r02 = next(
+                node for node in nodes.json()
+                if node["node_id"] == "R02"
+            )
+
+            assert r02["x"] == 5.0
+            assert r02["y"] == 5.0
+
+        finally:
+            client.post("/network/reset")

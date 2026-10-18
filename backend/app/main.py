@@ -4,14 +4,8 @@ from pydantic import BaseModel
 
 from app.models.message import Message, MessagePriority
 from app.models.node import Node, NodeType
-from app.network.event_log import EventLog
-from app.network.location_tracker import LocationTracker
-from app.network.lost_node_recovery import LostNodeRecovery
-from app.network.messaging import MessageService
-from app.network.monitor import NetworkMonitor
-from app.network.self_healing import SelfHealingManager
 from app.network.topology import NetworkTopology
-from app.simulation.simulator import NetworkSimulator
+from app.state import ApplicationState
 
 
 app = FastAPI(
@@ -63,7 +57,7 @@ def build_initial_network() -> NetworkTopology:
             x=5,
             y=0,
             speed=5,
-            direction=90,
+            direction=180,
         )
     )
 
@@ -97,29 +91,7 @@ def build_initial_network() -> NetworkTopology:
     return topology
 
 
-network = build_initial_network()
-
-monitor = NetworkMonitor(network)
-self_healing = SelfHealingManager(network)
-
-event_log = EventLog()
-message_service = MessageService(network, event_log)
-
-location_tracker = LocationTracker()
-
-recovery_manager = LostNodeRecovery(
-    network,
-    location_tracker,
-    communication_range=COMMUNICATION_RANGE,
-)
-
-simulator = NetworkSimulator(
-    network,
-    communication_range=COMMUNICATION_RANGE,
-    recovery_manager=recovery_manager,
-    location_tracker=location_tracker,
-)
-
+state = ApplicationState(build_initial_network(), COMMUNICATION_RANGE)
 
 @app.get("/")
 def health_check() -> dict:
@@ -135,7 +107,7 @@ def health_check() -> dict:
 def network_status() -> dict:
     """Return the current network health summary."""
 
-    return monitor.get_network_summary()
+    return state.monitor.get_network_summary()
 
 
 @app.get("/network/nodes")
@@ -154,7 +126,7 @@ def network_nodes() -> list[dict]:
             "speed": node.speed,
             "direction": node.direction,
         }
-        for node in network.get_all_nodes()
+        for node in state.network.get_all_nodes()
     ]
 
 
@@ -164,7 +136,7 @@ def network_topology() -> dict:
 
     connections = []
 
-    for node in network.get_all_nodes():
+    for node in state.network.get_all_nodes():
         for neighbor_id in node.neighbors:
             if node.node_id < neighbor_id:
                 connections.append(
@@ -180,7 +152,7 @@ def network_topology() -> dict:
                 "node_id": node.node_id,
                 "status": node.status.value,
             }
-            for node in network.get_all_nodes()
+            for node in state.network.get_all_nodes()
         ],
         "connections": connections,
     }
@@ -196,7 +168,7 @@ def network_events() -> list[dict]:
             "message": event.message,
             "timestamp": event.timestamp.isoformat(),
         }
-        for event in event_log.get_events()
+        for event in state.event_log.get_events()
     ]
 
 
@@ -204,50 +176,11 @@ def network_events() -> list[dict]:
 def reset_network() -> dict:
     """Reset the simulation back to its initial topology and state."""
 
-    global network
-    global monitor
-    global self_healing
-    global message_service
-    global location_tracker
-    global recovery_manager
-    global simulator
-
-    network = build_initial_network()
-
-    monitor = NetworkMonitor(network)
-
-    self_healing = SelfHealingManager(network)
-
-    message_service = MessageService(
-        network,
-        event_log,
-    )
-
-    location_tracker = LocationTracker()
-
-    recovery_manager = LostNodeRecovery(
-        network,
-        location_tracker,
-        communication_range=COMMUNICATION_RANGE,
-    )
-
-    simulator = NetworkSimulator(
-        network,
-        communication_range=COMMUNICATION_RANGE,
-        recovery_manager=recovery_manager,
-        location_tracker=location_tracker,
-    )
-
-    event_log.clear()
-
-    event_log.record(
-        "RESET",
-        "Network reset to initial topology.",
-    )
+    state.reset(build_initial_network())
 
     return {
         "status": "reset",
-        "nodes": len(network.get_all_nodes()),
+        "nodes": len(state.network.get_all_nodes()),
     }
 
 
@@ -256,14 +189,14 @@ def fail_node(node_id: str) -> dict:
     """Simulate a network node failure."""
 
     try:
-        simulator.fail_node(node_id)
+        state.simulator.fail_node(node_id)
 
     except ValueError as error:
         return {
             "error": str(error),
         }
 
-    event_log.record(
+    state.event_log.record(
         "NODE_OFFLINE",
         f"{node_id} failed and went OFFLINE.",
     )
@@ -279,14 +212,14 @@ def recover_node(node_id: str) -> dict:
     """Simulate a network node recovering."""
 
     try:
-        simulator.recover_node(node_id)
+        state.simulator.recover_node(node_id)
 
     except ValueError as error:
         return {
             "error": str(error),
         }
 
-    event_log.record(
+    state.event_log.record(
         "NODE_ONLINE",
         f"{node_id} recovered and is back ONLINE.",
     )
@@ -305,7 +238,7 @@ def move_node(
     """Move a node and detect communication loss."""
 
     try:
-        lost_detected = simulator.move_node(
+        lost_detected = state.simulator.move_node(
             node_id,
             request.x,
             request.y,
@@ -316,15 +249,15 @@ def move_node(
             "error": str(error),
         }
 
-    node = network.get_node(node_id)
+    node = state.network.get_node(node_id)
 
-    event_log.record(
+    state.event_log.record(
         "NODE_MOVED",
         f"{node_id} moved to ({node.x}, {node.y}).",
     )
 
     if lost_detected:
-        event_log.record(
+        state.event_log.record(
             "NODE_LOST",
             f"{node_id} lost communication "
             f"(no reachable neighbor within "
@@ -351,7 +284,7 @@ def recover_lost_node(
     """Recover a lost node using prediction and collaborative search."""
 
     try:
-        result = recovery_manager.recover(
+        result = state.recovery_manager.recover(
             node_id,
             request.elapsed_time,
         )
@@ -363,7 +296,7 @@ def recover_lost_node(
 
     prediction = result["prediction"]
 
-    event_log.record(
+    state.event_log.record(
         "PREDICTION",
         f"Predicted search area for {node_id}: "
         f"({prediction['predicted_x']:.1f}, "
@@ -371,14 +304,14 @@ def recover_lost_node(
         f"radius {prediction['search_radius']:.1f}.",
     )
 
-    event_log.record(
+    state.event_log.record(
         "HELPER_SELECTED",
         f"{result['helper']['node_id']} selected as "
         f"recovery helper for {node_id} "
         f"(score {result['helper']['score']:.2f}).",
     )
 
-    event_log.record(
+    state.event_log.record(
         "ASTAR_SEARCH",
         f"A* search route for "
         f"{result['helper']['node_id']}: "
@@ -387,12 +320,12 @@ def recover_lost_node(
 
     if result["status"] == "FOUND":
 
-        event_log.record(
+        state.event_log.record(
             "NODE_FOUND",
             f"{node_id} rediscovered.",
         )
 
-        event_log.record(
+        state.event_log.record(
             "TOPOLOGY_REBUILT",
             f"{node_id} reconnected to: "
             f"{', '.join(result.get('reconnected_to', [])) or 'none'}.",
@@ -406,7 +339,7 @@ def recovery_status(node_id: str) -> dict:
     """Return the current recovery information for a node."""
 
     try:
-        return recovery_manager.get_status(node_id)
+        return state.recovery_manager.get_status(node_id)
 
     except ValueError as error:
         return {
@@ -422,7 +355,7 @@ def helper_candidates(
 ) -> list[dict]:
     """Return every online node ranked as a candidate recovery helper."""
 
-    return recovery_manager.helper_selector.rank_helpers(
+    return state.recovery_manager.helper_selector.rank_helpers(
         node_id,
         predicted_x,
         predicted_y,
@@ -437,7 +370,7 @@ def network_route(
     """Find the current route between two network nodes."""
 
     try:
-        route = self_healing.recover_route(
+        route = state.self_healing.recover_route(
             source_id,
             destination_id,
         )
@@ -469,7 +402,7 @@ def send_message(request: MessageRequest) -> dict:
     )
 
     try:
-        route = message_service.send_message(message)
+        route = state.message_service.send_message(message)
 
     except ValueError as error:
         return {

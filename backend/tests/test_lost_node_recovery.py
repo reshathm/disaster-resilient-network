@@ -83,7 +83,8 @@ def test_complete_lost_node_recovery():
     assert result["search"]["travel_required"] is False
 
     assert result["discovery"]["discovered"] is True
-    assert result["discovery"]["distance"] == 4.0
+    # Discovery measures distance to the predicted search location.
+    assert result["discovery"]["distance"] == 0.0
 
     assert topology.get_node("R02").status == NodeStatus.ONLINE
     assert topology.get_neighbors("R02") == {"R04": 1.0}

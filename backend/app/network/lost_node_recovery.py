@@ -128,16 +128,8 @@ class LostNodeRecovery:
             helper["node_id"],
             node_id,
             prediction["search_radius"],
-            target_x=(
-                prediction["predicted_x"]
-                if helper_travelled
-                else None
-            ),
-            target_y=(
-                prediction["predicted_y"]
-                if helper_travelled
-                else None
-            ),
+            target_x=prediction["predicted_x"],
+            target_y=prediction["predicted_y"],
         )
 
         # The helper's movement is only a simulation of the search.

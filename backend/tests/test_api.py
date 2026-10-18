@@ -146,3 +146,53 @@ def test_node_movement_via_api():
 
         finally:
             client.post("/network/reset")
+
+
+def test_lost_node_recovery_via_api():
+    """Move R02 out of range, then recover it through the API."""
+
+    with TestClient(app) as client:
+        try:
+            assert client.post("/network/reset").status_code == 200
+
+            moved = client.post(
+                "/network/nodes/R02/move",
+                json={"x": 32.0, "y": 0.0},
+            )
+            assert moved.status_code == 200
+            moved = moved.json()
+            assert moved["lost_detected"] is True
+            assert moved["status"] == "lost"
+
+            recovery = client.post(
+                "/network/nodes/R02/recover-lost",
+                json={"elapsed_time": 3.0},
+            )
+            assert recovery.status_code == 200
+            result = recovery.json()
+
+            assert result["status"] == "FOUND"
+            assert abs(result["prediction"]["predicted_x"] - 17.0) < 1e-6
+            assert abs(result["prediction"]["predicted_y"]) < 1e-6
+            assert set(result["reconnected_to"]) == {"R03", "R04", "C01"}
+
+            nodes = client.get("/network/nodes").json()
+            r02 = next(n for n in nodes if n["node_id"] == "R02")
+            assert r02["status"] == "online"
+            assert abs(r02["x"] - 17.0) < 1e-6
+
+            events = client.get("/network/events").json()
+            event_types = {e["event_type"] for e in events}
+
+            for expected in (
+                "NODE_LOST",
+                "PREDICTION",
+                "HELPER_SELECTED",
+                "ASTAR_SEARCH",
+                "NODE_FOUND",
+                "TOPOLOGY_REBUILT",
+            ):
+                assert expected in event_types
+
+        finally:
+            client.post("/network/reset")

@@ -3,12 +3,13 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from app.dependencies import get_state
+from app.locked_route import LockedRoute
 from app.initial_network import COMMUNICATION_RANGE
 from app.recovery_requests import MoveRequest, RecoveryRequest
 from app.state import ApplicationState
 
 
-router = APIRouter(prefix="/network/nodes", tags=["Recovery"])
+router = APIRouter(route_class=LockedRoute, prefix="/network/nodes", tags=["Recovery"])
 
 
 @router.post("/{node_id}/move")

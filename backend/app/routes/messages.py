@@ -3,12 +3,13 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from app.dependencies import get_state
+from app.locked_route import LockedRoute
 from app.message_requests import MessageRequest
 from app.models.message import Message
 from app.state import ApplicationState
 
 
-router = APIRouter(prefix="/network/messages", tags=["Messages"])
+router = APIRouter(route_class=LockedRoute, prefix="/network/messages", tags=["Messages"])
 
 
 @router.post("/send")

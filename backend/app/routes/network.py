@@ -3,11 +3,12 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from app.dependencies import get_state
+from app.locked_route import LockedRoute
 from app.initial_network import build_initial_network
 from app.state import ApplicationState
 
 
-router = APIRouter(prefix="/network", tags=["Network"])
+router = APIRouter(route_class=LockedRoute, prefix="/network", tags=["Network"])
 
 
 @router.get("/status")

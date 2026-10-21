@@ -1,3 +1,5 @@
+from threading import RLock
+
 from app.network.event_log import EventLog
 from app.network.location_tracker import LocationTracker
 from app.network.lost_node_recovery import LostNodeRecovery
@@ -16,6 +18,7 @@ class ApplicationState:
         topology: NetworkTopology,
         communication_range: float,
     ):
+        self.lock = RLock()
         self.communication_range = communication_range
         self.event_log = EventLog()
         self._initialize_services(topology)
@@ -43,9 +46,10 @@ class ApplicationState:
 
     def reset(self, topology: NetworkTopology):
         """Rebuild services while preserving the event log instance."""
-        self._initialize_services(topology)
-        self.event_log.clear()
-        self.event_log.record(
-            "RESET",
-            "Network reset to initial topology.",
-        )
+        with self.lock:
+            self._initialize_services(topology)
+            self.event_log.clear()
+            self.event_log.record(
+                "RESET",
+                "Network reset to initial topology.",
+            )

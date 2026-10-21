@@ -1,0 +1,10 @@
+{
+  "communication_range": 16.0,
+  "nodes": [
+    {"id": "R01", "type": "rescue_team", "x": 0, "y": 0},
+    {"id": "R02", "type": "rescue_team", "x": 5, "y": 0, "speed": 5, "direction": 180},
+    {"id": "R03", "type": "drone", "x": 10, "y": 0},
+    {"id": "R04", "type": "fire_rescue", "x": 5, "y": 5},
+    {"id": "C01", "type": "command_center", "x": 15, "y": 0}
+  ]
+}

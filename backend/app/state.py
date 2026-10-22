@@ -7,6 +7,8 @@ from app.network.messaging import MessageService
 from app.network.monitor import NetworkMonitor
 from app.network.self_healing import SelfHealingManager
 from app.network.topology import NetworkTopology
+from app.simulation.driver import SimulationDriver
+from app.simulation.engine import SimulationEngine
 from app.simulation.simulator import NetworkSimulator
 
 
@@ -43,6 +45,12 @@ class ApplicationState:
             recovery_manager=self.recovery_manager,
             location_tracker=self.location_tracker,
         )
+        self.engine = SimulationEngine(
+            self.network,
+            self.communication_range,
+            lock=self.lock,
+        )
+        self.driver = SimulationDriver(self.engine)
 
     def reset(self, topology: NetworkTopology):
         """Rebuild services while preserving the event log instance."""

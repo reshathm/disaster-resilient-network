@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import math
 from threading import RLock
 
@@ -11,6 +13,7 @@ class SimulationEngine:
         self,
         topology: NetworkTopology,
         communication_range: float,
+        lock: RLock | None = None,
     ) -> None:
         if not math.isfinite(communication_range) or communication_range <= 0:
             raise ValueError("Communication range must be positive and finite.")
@@ -19,7 +22,7 @@ class SimulationEngine:
         self.communication_range = communication_range
         self.simulation_time = 0.0
         self._moving_nodes: set[str] = set()
-        self.lock = RLock()
+        self.lock = lock if lock is not None else RLock()
 
     def start_movement(self, node_id: str) -> None:
         """Activate movement using the node's speed and direction."""

@@ -79,3 +79,39 @@ def advance_simulation(
         "advanced_time": state.engine.simulation_time - previous_time,
         "simulation_time": state.engine.simulation_time,
     }
+
+
+class SpeedRequest(BaseModel):
+    speed: float
+
+    @field_validator("speed")
+    @classmethod
+    def validate_speed(cls, value: float) -> float:
+        if not math.isfinite(value) or value <= 0:
+            raise ValueError("Speed must be positive and finite.")
+        return value
+
+
+@router.post("/pause")
+def pause_simulation(
+    state: Annotated[ApplicationState, Depends(get_state)],
+) -> dict:
+    state.driver.pause()
+    return {"paused": True}
+
+
+@router.post("/resume")
+def resume_simulation(
+    state: Annotated[ApplicationState, Depends(get_state)],
+) -> dict:
+    state.driver.resume()
+    return {"paused": False}
+
+
+@router.post("/speed")
+def set_simulation_speed(
+    request: SpeedRequest,
+    state: Annotated[ApplicationState, Depends(get_state)],
+) -> dict:
+    state.driver.set_speed(request.speed)
+    return {"speed": state.driver.speed}

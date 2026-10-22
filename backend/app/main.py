@@ -1,4 +1,9 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
+
+from app.dependencies import get_state
+from app.simulation.worker import SimulationWorker
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.routes.network import router as network_router
@@ -7,9 +12,20 @@ from app.routes.messages import router as messages_router
 from app.routes.simulation import router as simulation_router
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    worker = SimulationWorker(get_state())
+    worker.start()
+    try:
+        yield
+    finally:
+        worker.stop()
+
+
 app = FastAPI(
     title="Disaster-Resilient Emergency Communication Network",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
